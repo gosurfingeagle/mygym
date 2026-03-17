@@ -1,0 +1,2064 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="鐵人日誌" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.svg" />
+  <title>鐵人日誌 — 健身紀錄</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface2: #1e1e1e;
+      --surface3: #282828;
+      --border: #2a2a2a;
+      --gold: #f0a500;
+      --gold-dim: #a07000;
+      --gold-glow: rgba(240,165,0,0.15);
+      --text: #f0f0f0;
+      --text2: #888;
+      --text3: #555;
+      --red: #e05252;
+      --green: #52c07a;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --nav-h: 72px;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    html { font-size: 18px; }
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      user-select: none;
+    }
+
+    /* ── SPLASH ── */
+    #splash {
+      position: fixed; inset: 0; z-index: 999;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px;
+      transition: opacity 0.5s, visibility 0.5s;
+    }
+    #splash.hidden { opacity: 0; visibility: hidden; }
+    #splash .logo-text {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 56px; letter-spacing: 4px;
+      color: var(--gold); line-height: 1;
+    }
+    #splash .sub { font-size: 13px; color: var(--text2); letter-spacing: 3px; text-transform: uppercase; }
+    #splash .bar-wrap { width: 120px; height: 3px; background: var(--surface3); border-radius: 2px; margin-top: 24px; overflow: hidden; }
+    #splash .bar { height: 100%; width: 0; background: var(--gold); border-radius: 2px; animation: load 1.2s ease forwards 0.3s; }
+    @keyframes load { to { width: 100%; } }
+
+    /* ── LAYOUT ── */
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+    #app.visible { display: flex; }
+
+    .view { display: none; flex: 1; overflow-y: auto; padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px); }
+    .view.active { display: block; }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(10,10,10,0.92);
+      backdrop-filter: blur(12px);
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-title { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--gold); }
+    .topbar-date { font-size: 12px; color: var(--text2); }
+
+    /* ── BOTTOM NAV ── */
+    nav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      height: calc(var(--nav-h) + var(--safe-bottom));
+      background: rgba(14,14,14,0.97);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: flex-start; padding-top: 8px;
+      padding-bottom: var(--safe-bottom);
+    }
+    .nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 4px 0; background: none; border: none; cursor: pointer;
+      color: var(--text3); transition: color 0.2s;
+    }
+    .nav-btn.active { color: var(--gold); }
+    .nav-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .nav-btn span { font-size: 10px; font-weight: 500; letter-spacing: 0.5px; }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin: 0 16px 12px;
+    }
+    .card-title { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+
+    /* ── TODAY VIEW ── */
+    .today-header { padding: 20px 16px 8px; }
+    .today-greeting { font-family: 'Bebas Neue', sans-serif; font-size: 38px; letter-spacing: 2px; color: var(--text); line-height: 1; }
+    .today-greeting span { color: var(--gold); }
+    .today-sub { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+    /* Quick stats strip */
+    .stats-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; padding: 0 16px; margin-bottom: 16px; }
+    .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 10px; text-align: center; }
+    .stat-num { font-family: 'Bebas Neue', sans-serif; font-size: 26px; color: var(--gold); line-height: 1; }
+    .stat-lbl { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+    /* Add workout button */
+    .fab {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin: 0 16px 16px; padding: 16px;
+      background: var(--gold); color: #000;
+      font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px;
+      border: none; border-radius: var(--radius); cursor: pointer;
+      box-shadow: 0 4px 20px rgba(240,165,0,0.3);
+      transition: transform 0.15s, box-shadow 0.15s;
+      width: calc(100% - 32px);
+    }
+    .fab:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(240,165,0,0.2); }
+    .fab svg { width: 20px; height: 20px; stroke: #000; fill: none; stroke-width: 2.5; stroke-linecap: round; }
+
+    /* Today's sets list */
+    .set-entry {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .set-entry:last-child { border-bottom: none; }
+    .set-muscle-tag {
+      font-size: 10px; padding: 3px 7px; border-radius: 20px;
+      background: var(--surface3); color: var(--text2); white-space: nowrap;
+    }
+    .set-name { font-size: 14px; font-weight: 500; flex: 1; }
+    .set-detail { font-size: 13px; color: var(--text2); white-space: nowrap; }
+    .set-delete { padding: 4px; background: none; border: none; cursor: pointer; color: var(--text3); }
+    .set-delete:active { color: var(--red); }
+    .set-delete svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; }
+    .pr-badge { font-size: 9px; color: var(--gold); border: 1px solid var(--gold-dim); padding: 1px 5px; border-radius: 4px; margin-left: 4px; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text3); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; line-height: 1.6; }
+
+    /* ── MODAL ── */
+    .overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);
+      display: none; align-items: flex-end;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      width: 100%; background: var(--surface);
+      border-radius: 20px 20px 0 0;
+      border: 1px solid var(--border); border-bottom: none;
+      padding: 8px 20px 0; padding-bottom: calc(20px + var(--safe-bottom));
+      max-height: 92vh; overflow-y: auto;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 20px; }
+    .modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--gold); margin-bottom: 20px; }
+
+    /* Form elements */
+    .form-group { margin-bottom: 16px; }
+    .form-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; display: block; }
+
+    select, input[type="number"], input[type="text"], textarea {
+      width: 100%; padding: 14px 16px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text);
+      font-family: 'Noto Sans TC', sans-serif; font-size: 15px;
+      outline: none; transition: border-color 0.2s;
+      -webkit-appearance: none; appearance: none;
+    }
+    select:focus, input:focus, textarea:focus { border-color: var(--gold); }
+    select option { background: var(--surface2); }
+
+    .row3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .input-hint { font-size: 11px; color: var(--text3); margin-top: 6px; }
+
+    /* Rest timer inline */
+    .rest-timer-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; }
+    .rest-timer-display { font-family: 'Bebas Neue', sans-serif; font-size: 32px; color: var(--gold); }
+    .btn-sm {
+      padding: 8px 16px; border-radius: var(--radius-sm); border: none; cursor: pointer;
+      font-family: 'Noto Sans TC', sans-serif; font-size: 13px; font-weight: 500;
+      transition: transform 0.1s;
+    }
+    .btn-sm:active { transform: scale(0.96); }
+    .btn-primary { background: var(--gold); color: #000; }
+    .btn-ghost { background: var(--surface3); color: var(--text2); }
+    .btn-danger { background: rgba(224,82,82,0.15); color: var(--red); border: 1px solid rgba(224,82,82,0.3); }
+
+    .save-btn {
+      width: 100%; padding: 16px; margin-top: 8px; margin-bottom: 8px;
+      background: var(--gold); color: #000;
+      font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px;
+      border: none; border-radius: var(--radius); cursor: pointer;
+      box-shadow: 0 4px 20px rgba(240,165,0,0.25);
+      transition: transform 0.15s;
+    }
+    .save-btn:active { transform: scale(0.98); }
+
+    /* Equipment chips */
+    .muscle-filter { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 12px; -ms-overflow-style: none; scrollbar-width: none; }
+    .muscle-filter::-webkit-scrollbar { display: none; }
+    .chip {
+      padding: 6px 14px; border-radius: 20px; white-space: nowrap;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text2); font-size: 12px; cursor: pointer; transition: all 0.15s;
+    }
+    .chip.active { background: var(--gold-glow); border-color: var(--gold); color: var(--gold); }
+
+    /* ── HISTORY VIEW ── */
+    .history-day { margin: 0 16px 16px; }
+    .history-day-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; margin-bottom: 8px;
+    }
+    .history-day-date { font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--gold); }
+    .history-day-vol { font-size: 11px; color: var(--text3); }
+    .history-item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+      margin-bottom: 6px;
+    }
+    .history-item-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .history-item-name { font-size: 14px; font-weight: 500; }
+    .history-item-sets { display: flex; flex-wrap: wrap; gap: 6px; }
+    .history-set-chip {
+      font-size: 12px; padding: 3px 8px;
+      background: var(--surface2); border-radius: 4px; color: var(--text2);
+    }
+    .history-set-chip.pr { border: 1px solid var(--gold-dim); color: var(--gold); background: var(--gold-glow); }
+
+    /* ── PROGRESS VIEW ── */
+    .chart-wrap { padding: 0 8px; margin-top: 12px; }
+    canvas { max-height: 220px; }
+
+    .progress-eq-select { margin: 0 16px 12px; }
+
+    .vol-week-strip { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; padding: 0 16px; margin-bottom: 4px; }
+    .vol-day { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .vol-bar-wrap { width: 100%; height: 48px; display: flex; align-items: flex-end; }
+    .vol-bar-inner { width: 100%; background: var(--gold); border-radius: 3px 3px 0 0; min-height: 3px; transition: height 0.4s ease; }
+    .vol-day-lbl { font-size: 9px; color: var(--text3); }
+
+    /* ── EQUIPMENT VIEW ── */
+    .eq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px; }
+    .eq-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative; overflow: hidden;
+    }
+    .eq-card:active { background: var(--surface2); }
+    .eq-card-muscle {
+      font-size: 10px; color: var(--gold); text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .eq-card-name { font-size: 14px; font-weight: 600; line-height: 1.3; }
+    .eq-card-icon { font-size: 28px; position: absolute; right: 12px; top: 12px; opacity: 0.2; }
+    .eq-card-tip { font-size: 11px; color: var(--text3); margin-top: 6px; line-height: 1.4; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px); left: 50%; transform: translateX(-50%);
+      background: var(--surface3); color: var(--text); padding: 10px 20px;
+      border-radius: 24px; font-size: 13px; white-space: nowrap;
+      opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 500;
+      border: 1px solid var(--border);
+    }
+    .toast.show { opacity: 1; }
+
+    /* Timer ring */
+    .timer-modal { align-items: center; }
+    .timer-modal .modal { border-radius: 20px; margin: 20px; max-height: 85vh; }
+    .timer-ring-wrap { display: flex; flex-direction: column; align-items: center; padding: 20px 0 8px; }
+    .timer-ring-svg { transform: rotate(-90deg); }
+    .timer-ring-text { font-family: 'Bebas Neue', sans-serif; font-size: 52px; fill: var(--text); }
+    .timer-sub-text { font-size: 11px; fill: var(--text3); }
+
+
+
+
+
+    /* ── EQUIPMENT EDIT ── */
+    .eq-card-actions {
+      display:flex; gap:6px; margin-top:10px; padding-top:8px;
+      border-top:1px solid var(--border);
+    }
+    .eq-action-btn {
+      flex:1; padding:6px 0; border-radius:6px; border:none; cursor:pointer;
+      font-family:'Noto Sans TC',sans-serif; font-size:11px; font-weight:500;
+      transition:opacity 0.15s;
+    }
+    .eq-action-btn:active { opacity:0.7; }
+    .eq-btn-edit  { background:var(--surface3); color:var(--text2); }
+    .eq-btn-add   { background:var(--gold-glow); color:var(--gold); }
+    .eq-btn-del   { background:rgba(224,82,82,0.12); color:var(--red); }
+    .eq-card.custom-eq { border-color:rgba(240,165,0,0.3); }
+    .custom-badge {
+      font-size:9px; padding:2px 5px; border-radius:3px;
+      background:var(--gold-glow); color:var(--gold); margin-left:4px;
+      vertical-align:middle;
+    }
+    .eq-edit-mode .eq-card-tip { display:none; }
+    /* ── ADD TO TEMPLATE PROMPT ── */
+    .tpl-prompt {
+      position:fixed; bottom:calc(var(--nav-h) + var(--safe-bottom) + 12px); left:12px; right:12px;
+      background:var(--surface2); border:1px solid var(--gold-dim);
+      border-radius:var(--radius); padding:14px 16px;
+      z-index:300; box-shadow:0 4px 24px rgba(0,0,0,0.5);
+      transform:translateY(120%); opacity:0;
+      transition:transform 0.3s ease, opacity 0.3s ease;
+      pointer-events:none;
+    }
+    .tpl-prompt.show { transform:translateY(0); opacity:1; pointer-events:auto; }
+    .tpl-prompt-title { font-size:13px; font-weight:600; color:var(--gold); margin-bottom:10px; }
+    .tpl-prompt-chips { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:10px; }
+    .tpl-prompt-chip {
+      padding:7px 14px; border-radius:20px; font-size:13px;
+      background:var(--surface3); border:1px solid var(--border);
+      color:var(--text2); cursor:pointer; transition:all 0.15s;
+    }
+    .tpl-prompt-chip:active { background:var(--gold-glow); border-color:var(--gold); color:var(--gold); }
+    .tpl-prompt-dismiss { font-size:12px; color:var(--text3); cursor:pointer; text-align:center; padding:4px; }
+    /* ── TEMPLATE APPLY ── */
+    .tpl-apply-row {
+      background:var(--surface2); border:1px solid var(--border);
+      border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:10px;
+    }
+    .tpl-apply-row-header {
+      display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;
+    }
+    .tpl-apply-row-name { font-size:14px; font-weight:600; }
+    .tpl-apply-row-hint { font-size:11px; color:var(--gold); }
+    .tpl-apply-skip { font-size:11px; color:var(--text3); cursor:pointer; padding:4px 8px;
+      border:1px solid var(--border); border-radius:4px; background:none; }
+    .tpl-apply-skip.skipped { color:var(--red); border-color:rgba(224,82,82,0.4); background:rgba(224,82,82,0.08); }
+    .tpl-apply-inputs { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+    .tpl-apply-inputs input {
+      width:100%; padding:10px 10px; text-align:center;
+      background:var(--surface3); border:1px solid var(--border);
+      border-radius:var(--radius-sm); color:var(--text);
+      font-family:'Noto Sans TC',sans-serif; font-size:15px; font-weight:600;
+      outline:none;
+    }
+    .tpl-apply-inputs input:focus { border-color:var(--gold); }
+    .tpl-apply-inputs label { font-size:10px; color:var(--text3); text-align:center; display:block; margin-top:3px; }
+    /* ── TEMPLATE ── */
+    .tpl-chip {
+      display:flex; align-items:center; gap:6px;
+      padding:8px 14px; border-radius:20px; white-space:nowrap;
+      background:var(--surface); border:1px solid var(--border);
+      color:var(--text2); font-size:13px; cursor:pointer; transition:all 0.15s;
+    }
+    .tpl-chip.active { background:var(--gold-glow); border-color:var(--gold); color:var(--gold); }
+    .tpl-chip .del { color:var(--text3); font-size:16px; padding:0 2px; }
+    .tpl-row { display:flex; gap:8px; overflow-x:auto; padding:0 0 8px; -ms-overflow-style:none; scrollbar-width:none; }
+    .tpl-row::-webkit-scrollbar { display:none; }
+
+    /* ── TREADMILL ── */
+    .cardio-entry .set-name { color:var(--text); }
+    .cardio-badge { font-size:10px; padding:2px 7px; border-radius:4px; background:rgba(82,192,122,0.15); color:#52c07a; border:1px solid rgba(82,192,122,0.3); margin-left:4px; }
+
+    /* ── WEIGHT ── */
+    .weight-strip { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); }
+    .weight-strip:last-child { border-bottom:none; }
+    .weight-val { font-family:'Bebas Neue',sans-serif; font-size:24px; color:var(--gold); }
+    .weight-date { font-size:11px; color:var(--text3); flex:1; }
+    .weight-diff-up { font-size:11px; color:var(--red); }
+    .weight-diff-down { font-size:11px; color:#52c07a; }
+
+    /* ── EXPORT BTN ── */
+    .export-btn { font-size:12px; padding:6px 12px; }
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 0; }
+  </style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="logo-text">鐵人日誌</div>
+  <div class="sub">Iron Log</div>
+  <div class="bar-wrap"><div class="bar"></div></div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- TODAY VIEW -->
+  <div class="view active" id="view-today">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">今日訓練</div>
+        <div class="topbar-date" id="today-date-display"></div>
+      </div>
+      <button class="btn-sm btn-ghost" onclick="openRestTimer()">⏱ 休息計時</button>
+    </div>
+    <div class="today-header">
+      <div class="today-greeting">開始<span>燃燒</span>。</div>
+      <div class="today-sub" id="today-sub-msg">今天還沒有紀錄，按下方按鈕開始！</div>
+    </div>
+    <div class="stats-strip">
+      <div class="stat-box"><div class="stat-num" id="stat-sets">0</div><div class="stat-lbl">組數</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-vol">0</div><div class="stat-lbl">訓練量 kg</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-eq">0</div><div class="stat-lbl">器材</div></div>
+    </div>
+    <!-- Template row -->
+    <div style="padding:0 16px 8px;">
+      <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">常用模板</div>
+      <div class="tpl-row" id="today-tpl-row">
+        <div class="tpl-chip" onclick="openTplModal()" style="border-style:dashed;">
+          <span>＋ 管理模板</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 16px 16px;">
+      <button class="fab" style="flex:3;margin:0;" onclick="openAddModal()">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        新增訓練組數
+      </button>
+      <button class="fab" style="flex:2;margin:0;background:rgba(82,192,122,0.15);color:#52c07a;box-shadow:none;border:1px solid rgba(82,192,122,0.3);" onclick="openCardioModal()">
+        🏃 跑步機
+      </button>
+    </div>
+    <div class="card">
+      <div class="card-title">今日記錄</div>
+      <div id="today-list">
+        <div class="empty-state">
+          <div class="icon">🏋️</div>
+          <p>今天還沒有訓練紀錄<br>加油！開始你的第一組</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY VIEW -->
+  <div class="view" id="view-history">
+    <div class="topbar">
+      <div class="topbar-title">訓練歷史</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-sm btn-ghost export-btn" onclick="exportCSV()">📥 匯出</button>
+        <button class="btn-sm btn-primary export-btn" onclick="openImportModal()">📤 匯入</button>
+      </div>
+    </div>
+    <div id="history-content" style="padding-top: 12px;"></div>
+  </div>
+
+  <!-- PROGRESS VIEW -->
+  <div class="view" id="view-progress">
+    <div class="topbar">
+      <div class="topbar-title">進步追蹤</div>
+    </div>
+    <div style="padding-top: 16px;">
+      <div class="card">
+        <div class="card-title">本週訓練量分佈</div>
+        <div class="vol-week-strip" id="week-vol-strip"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom: 8px;">器材重量進步</div>
+        <div class="form-group" style="margin-bottom: 8px;">
+          <select id="progress-eq-select" onchange="renderProgressChart()">
+            <option value="">— 選擇器材 —</option>
+          </select>
+        </div>
+        <div class="chart-wrap"><canvas id="progress-chart"></canvas></div>
+        <div id="progress-empty" class="empty-state" style="display:none;">
+          <div class="icon">📈</div><p>選擇器材後顯示進步曲線</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">個人最佳 (PR)</div>
+        <div id="pr-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:8px;">體重紀錄</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+          <input type="number" id="inp-weight-log" min="30" max="200" step="0.1" placeholder="今日體重 kg"
+            style="flex:1;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'Noto Sans TC',sans-serif;font-size:14px;outline:none;" />
+          <button class="btn-sm btn-primary" style="padding:12px 16px;" onclick="saveWeight()">記錄</button>
+        </div>
+        <div class="chart-wrap" style="margin-bottom:12px;"><canvas id="weight-chart"></canvas></div>
+        <div id="weight-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EQUIPMENT VIEW -->
+  <div class="view" id="view-equipment">
+    <div class="topbar">
+      <div class="topbar-title">器材庫</div>
+    </div>
+    <div class="muscle-filter" id="muscle-filter-chips" style="margin-top: 12px;"></div>
+    <div style="display:flex;gap:10px;padding:0 16px 14px;">
+      <button class="btn-sm btn-ghost" id="eq-manage-btn" onclick="toggleEqManage()"
+        style="flex:1;padding:12px 0;font-size:14px;border-radius:var(--radius-sm);">✏️ 管理器材</button>
+      <button class="btn-sm btn-primary" onclick="openEqEditModal(null)"
+        style="flex:1;padding:12px 0;font-size:14px;border-radius:var(--radius-sm);">＋ 新增器材</button>
+    </div>
+    <div class="eq-grid" id="eq-grid"></div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav>
+    <button class="nav-btn active" data-view="today" onclick="switchView('today',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>今日</span>
+    </button>
+    <button class="nav-btn" data-view="history" onclick="switchView('history',this)">
+      <svg viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 0 .5-4"/><polyline points="3 3 3 7 7 7"/></svg>
+      <span>歷史</span>
+    </button>
+    <button class="nav-btn" data-view="progress" onclick="switchView('progress',this)">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span>進步</span>
+    </button>
+    <button class="nav-btn" data-view="equipment" onclick="switchView('equipment',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      <span>器材庫</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ADD WORKOUT MODAL -->
+<div class="overlay" id="add-overlay" onclick="handleOverlayClick(event, 'add-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-main-title">新增組數</div>
+
+    <div class="form-group">
+      <label class="form-label">訓練日期</label>
+      <input type="date" id="inp-date" onchange="onDateChange()" style="width:100%;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'Noto Sans TC',sans-serif;font-size:15px;outline:none;-webkit-appearance:none;appearance:none;color-scheme:dark;" />
+      <div id="date-tag" class="input-hint" style="margin-top:6px;color:var(--gold);"></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">器材 / 動作</label>
+      <select id="eq-select" onchange="onEqChange()">
+        <option value="">— 選擇器材 —</option>
+      </select>
+    </div>
+    <div id="last-record-hint" class="input-hint" style="margin-top: -8px; margin-bottom: 12px; color: var(--gold);"></div>
+
+    <div class="row3">
+      <div class="form-group">
+        <label class="form-label">重量 (kg)</label>
+        <input type="number" id="inp-weight" min="0" step="2.5" placeholder="60" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">組數</label>
+        <input type="number" id="inp-sets" min="1" step="1" placeholder="3" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">次數</label>
+        <input type="number" id="inp-reps" min="1" step="1" placeholder="10" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">備註（選填）</label>
+      <textarea id="inp-note" rows="2" placeholder="感覺不錯、調整握距..." style="resize:none;"></textarea>
+    </div>
+
+    <button class="save-btn" onclick="saveSet()">儲存這組</button>
+    <button class="btn-sm btn-ghost" style="width:100%;margin-bottom:16px;" onclick="closeModal('add-overlay')">取消</button>
+  </div>
+</div>
+
+
+<!-- CARDIO (TREADMILL) MODAL -->
+<div class="overlay" id="cardio-overlay" onclick="handleOverlayClick(event,'cardio-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🏃 跑步機紀錄</div>
+    <div class="form-group">
+      <label class="form-label">訓練日期</label>
+      <input type="date" id="cardio-date" style="width:100%;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'Noto Sans TC',sans-serif;font-size:15px;outline:none;color-scheme:dark;" />
+    </div>
+    <div class="row3">
+      <div class="form-group">
+        <label class="form-label">時間 (分鐘)</label>
+        <input type="number" id="cardio-duration" min="1" step="1" placeholder="30" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">距離 (km)</label>
+        <input type="number" id="cardio-distance" min="0" step="0.1" placeholder="3.5" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">均速 (km/h)</label>
+        <input type="number" id="cardio-speed" min="0" step="0.5" placeholder="7.0" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">卡路里（選填）</label>
+      <input type="number" id="cardio-cal" min="0" step="1" placeholder="250" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">備註（選填）</label>
+      <textarea id="cardio-note" rows="2" placeholder="輕鬆跑、間歇..." style="resize:none;"></textarea>
+    </div>
+    <button class="save-btn" onclick="saveCardio()">儲存紀錄</button>
+    <button class="btn-sm btn-ghost" style="width:100%;margin-bottom:16px;" onclick="closeModal('cardio-overlay')">取消</button>
+  </div>
+</div>
+
+<!-- TEMPLATE MODAL -->
+<div class="overlay" id="tpl-overlay" onclick="handleOverlayClick(event,'tpl-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">訓練模板</div>
+    <div id="tpl-list-edit" style="margin-bottom:16px;"></div>
+    <div style="border-top:1px solid var(--border);padding-top:16px;">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:10px;">＋ 建立新模板</div>
+      <div class="form-group">
+        <label class="form-label">模板名稱</label>
+        <input type="text" id="tpl-name-inp" placeholder="例如：腿日、胸背日..." />
+      </div>
+      <div class="form-group">
+        <label class="form-label">選擇器材（可複選）</label>
+        <div id="tpl-eq-checklist" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:220px;overflow-y:auto;padding:4px 0;"></div>
+      </div>
+      <button class="save-btn" style="margin-top:8px;" onclick="saveTpl()">儲存模板</button>
+    </div>
+    <button class="btn-sm btn-ghost" style="width:100%;margin-bottom:16px;margin-top:8px;" onclick="closeModal('tpl-overlay')">關閉</button>
+  </div>
+</div>
+
+<!-- TEMPLATE APPLY MODAL -->
+<div class="overlay" id="tpl-apply-overlay" onclick="handleOverlayClick(event,'tpl-apply-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div class="modal-title" id="tpl-apply-title" style="margin-bottom:0;">套用模板</div>
+      <div style="font-size:12px;color:var(--text2);">確認後一次儲存</div>
+    </div>
+    <div class="form-group" style="margin-bottom:16px;">
+      <label class="form-label">訓練日期</label>
+      <input type="date" id="tpl-apply-date"
+        style="width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'Noto Sans TC',sans-serif;font-size:14px;outline:none;color-scheme:dark;" />
+    </div>
+    <div id="tpl-apply-list"></div>
+    <button class="save-btn" onclick="saveTemplateAll()">💾 全部儲存</button>
+    <button class="btn-sm btn-ghost" style="width:100%;margin-bottom:16px;margin-top:6px;" onclick="closeModal('tpl-apply-overlay')">取消</button>
+  </div>
+</div>
+
+<!-- EQUIPMENT EDIT/ADD MODAL -->
+<div class="overlay" id="eq-edit-overlay" onclick="handleOverlayClick(event,'eq-edit-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="eq-edit-title">新增器材</div>
+
+    <div class="form-group">
+      <label class="form-label">器材名稱</label>
+      <input type="text" id="eq-edit-name" placeholder="例如：坐姿胸推機" />
+    </div>
+    <div class="row2">
+      <div class="form-group">
+        <label class="form-label">肌群分類</label>
+        <select id="eq-edit-muscle">
+          <option value="胸">胸</option>
+          <option value="背">背</option>
+          <option value="腿">腿</option>
+          <option value="肩">肩</option>
+          <option value="手臂">手臂</option>
+          <option value="核心">核心</option>
+          <option value="有氧">有氧</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">圖示（Emoji）</label>
+        <input type="text" id="eq-edit-icon" placeholder="💪" maxlength="4" style="text-align:center;font-size:22px;" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">訓練提示（選填）</label>
+      <textarea id="eq-edit-tip" rows="3" placeholder="動作要點、注意事項..." style="resize:none;"></textarea>
+    </div>
+    <input type="hidden" id="eq-edit-id" value="" />
+
+    <button class="save-btn" onclick="saveEqEdit()">儲存器材</button>
+    <button class="btn-sm btn-ghost" style="width:100%;margin-bottom:16px;margin-top:6px;" onclick="closeModal('eq-edit-overlay')">取消</button>
+  </div>
+</div>
+
+<!-- IMPORT CSV MODAL -->
+<div class="overlay" id="import-overlay" onclick="handleOverlayClick(event,'import-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📤 匯入 CSV</div>
+
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px;">
+      <div style="font-size:13px;color:var(--text2);line-height:1.8;">
+        ✅ 支援從本 App 匯出的 CSV 檔案<br>
+        ✅ 重訓紀錄、有氧紀錄、體重紀錄<br>
+        ⚠️ 相同日期＋器材＋重量的紀錄不會重複匯入
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">選擇 CSV 檔案</label>
+      <div id="import-drop-zone"
+        style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:32px 16px;text-align:center;cursor:pointer;transition:border-color 0.2s;"
+        onclick="document.getElementById('import-file-input').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
+        ondragleave="this.style.borderColor='var(--border)'"
+        ondrop="handleFileDrop(event)">
+        <div style="font-size:32px;margin-bottom:8px;">📂</div>
+        <div style="font-size:14px;color:var(--text2);">點此選擇檔案</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">或拖曳 CSV 檔案到這裡</div>
+      </div>
+      <input type="file" id="import-file-input" accept=".csv" style="display:none;" onchange="handleFileSelect(event)" />
+    </div>
+
+    <div id="import-preview" style="display:none;margin-bottom:16px;">
+      <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">匯入預覽</div>
+      <div id="import-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;"></div>
+      <div id="import-sample" style="font-size:12px;color:var(--text3);max-height:120px;overflow-y:auto;background:var(--surface2);border-radius:var(--radius-sm);padding:10px;"></div>
+    </div>
+
+    <button class="save-btn" id="import-confirm-btn" style="display:none;" onclick="confirmImport()">✅ 確認匯入</button>
+    <button class="btn-sm btn-ghost" style="width:100%;margin-bottom:16px;margin-top:6px;" onclick="closeModal('import-overlay')">取消</button>
+  </div>
+</div>
+<!-- REST TIMER MODAL -->
+<div class="overlay timer-modal" id="timer-overlay" onclick="handleOverlayClick(event,'timer-overlay')">
+  <div class="modal" style="text-align:center;">
+    <div class="modal-handle"></div>
+    <div class="modal-title">休息計時</div>
+    <div class="timer-ring-wrap">
+      <svg width="180" height="180" viewBox="0 0 180 180" class="timer-ring-svg" id="timer-svg">
+        <circle cx="90" cy="90" r="80" fill="none" stroke="var(--surface3)" stroke-width="8"/>
+        <circle id="timer-arc" cx="90" cy="90" r="80" fill="none" stroke="var(--gold)" stroke-width="8"
+          stroke-dasharray="502.65" stroke-dashoffset="0" stroke-linecap="round"/>
+        <text id="timer-text" x="90" y="96" text-anchor="middle" class="timer-ring-text" transform="rotate(90 90 90)">--:--</text>
+        <text x="90" y="116" text-anchor="middle" class="timer-sub-text" transform="rotate(90 90 90)">REST</text>
+      </svg>
+    </div>
+    <div class="row3" style="gap:8px;padding:0 8px 16px;">
+      <button class="btn-sm btn-ghost" onclick="setRestTime(60)">1 分</button>
+      <button class="btn-sm btn-ghost" onclick="setRestTime(90)">1.5 分</button>
+      <button class="btn-sm btn-ghost" onclick="setRestTime(120)">2 分</button>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 8px 16px;">
+      <button class="btn-sm btn-primary" style="flex:1;padding:14px;" id="timer-start-btn" onclick="toggleTimer()">開始</button>
+      <button class="btn-sm btn-danger" style="flex:1;padding:14px;" onclick="resetTimer()">重置</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATA ──
+const EQUIPMENT = [
+  // ── 胸 ──
+  { id:'chest_press',   name:'胸部推舉機',   muscle:'胸',  icon:'💪', tip:'保持背部貼靠椅背，呼吸穩定推出' },
+  { id:'chest_machine', name:'胸推訓練機',   muscle:'胸',  icon:'🔲', tip:'手肘與肩同高，推出時完全伸展，感受胸肌用力' },
+  { id:'pec_fly',       name:'蝴蝶機',       muscle:'胸',  icon:'🦋', tip:'手肘微彎固定，夾胸時想像抱一棵大樹，頂點停頓感受胸肌' },
+  { id:'cable_cross',   name:'繩索夾胸',     muscle:'胸',  icon:'🔀', tip:'手肘微彎，從肩膀主導而非手臂' },
+  // ── 背 ──
+  { id:'lat_pull',      name:'滑輪下拉機',   muscle:'背',  icon:'⬇️', tip:'挺胸，將槓桿拉至下巴位置' },
+  { id:'high_pull_back',name:'高拉背部訓練機',muscle:'背', icon:'⬆️', tip:'挺胸收緊核心，以背闊肌發力向下拉，手肘往腰側收，頂點停頓1秒再緩慢回程' },
+  { id:'row_machine',   name:'坐姿划船機',   muscle:'背',  icon:'🚣', tip:'收縮肩胛骨，停頓後緩慢回程' },
+  { id:'dual_cable_row',name:'雙軸低拉划船機',muscle:'背', icon:'🔃', tip:'雙手同時拉向腰側，收緊肩胛骨後停頓，回程緩慢保持張力' },
+  { id:'back_ext',      name:'背部伸展機',   muscle:'背',  icon:'🔙', tip:'動作範圍勿過大，避免腰椎壓力' },
+  // ── 腿 ──
+  { id:'leg_sled',       name:'大腿推蹬訓練器',     muscle:'腿', icon:'🏗️', tip:'腳掌與肩同寬，膝蓋不鎖死，下降時吸氣推出時吐氣' },
+  { id:'leg_press',      name:'腿部推舉機',         muscle:'腿', icon:'🦵', tip:'腳跟寬度與肩同寬，膝蓋追著腳尖走' },
+  { id:'quad_ext',       name:'大腿伸展訓練機',     muscle:'腿', icon:'📏', tip:'膝蓋對準轉軸，完全伸展後停頓1秒，緩慢下降感受離心' },
+  { id:'leg_ext',        name:'腿部伸展機',         muscle:'腿', icon:'📐', tip:'動作頂端完全伸展，感受四頭肌' },
+  { id:'leg_curl',       name:'腿部彎舉機',         muscle:'腿', icon:'〽️', tip:'收縮至最大幅度，停頓1秒' },
+  { id:'seated_leg_curl',name:'腿後彎曲訓練機',     muscle:'腿', icon:'🦿', tip:'大腿固定不動，收縮至最大幅度，頂點停頓1秒' },
+  { id:'lying_leg_curl', name:'臥姿腿部彎曲訓練器', muscle:'腿', icon:'🛏️', tip:'腹部貼靠墊子，彎曲至最大幅度，下降時保持張力勿放太快' },
+  { id:'hip_adduct',     name:'髖內收訓練機',       muscle:'腿', icon:'⬅️', tip:'背部貼靠椅背，從鼠蹊部發力夾合，頂點停頓1秒，慢速回程保持張力' },
+  { id:'hip_abduct',     name:'髖關節外展訓練機',   muscle:'腿', icon:'➡️', tip:'背部靠緊椅背，以臀中肌發力向外推，回程緩慢控制' },
+  { id:'calf_raise',     name:'小腿訓練機',         muscle:'腿', icon:'🦶', tip:'動作放慢，完整伸展跟腱' },
+  // ── 肩 ──
+  { id:'shoulder_press', name:'肩部推舉機', muscle:'肩', icon:'🏋️', tip:'握距略寬於肩，勿聳肩' },
+  { id:'lateral_raise',  name:'側平舉機',   muscle:'肩', icon:'✈️', tip:'控制離心，速度2-3秒下降' },
+  // ── 手臂 ──
+  { id:'bicep_curl',  name:'二頭彎舉機',   muscle:'手臂', icon:'💪', tip:'上臂固定不動，完整動作範圍' },
+  { id:'cable_curl',  name:'繩索二頭彎舉', muscle:'手臂', icon:'🎣', tip:'手腕朝上，峰值收縮停留' },
+  { id:'tricep_ext',  name:'三頭伸展機',   muscle:'手臂', icon:'🔱', tip:'肘關節固定，專注在三頭肌出力' },
+  // ── 核心 ──
+  { id:'ab_crunch',  name:'腹肌捲腹機', muscle:'核心', icon:'〰️', tip:'呼氣時出力，感受腹直肌收縮' },
+  { id:'cable_rot',  name:'繩索旋轉',   muscle:'核心', icon:'🌀', tip:'從核心旋轉，非手臂牽引' },
+  { id:'lower_back', name:'下背訓練機', muscle:'核心', icon:'🔒', tip:'動作幅度不宜過大，緩慢伸展與彎曲，全程控制避免腰椎壓力' },
+];
+
+
+// ── EQUIPMENT LOOKUP (unified - never shows English IDs) ──
+const SPECIAL_EQ = {
+  treadmill:        { id:'treadmill',        name:'跑步機',        muscle:'有氧', icon:'🏃' },
+  // ── 舊版 ID（已刪除的重複器材，保留供歷史紀錄顯示）──
+  seated_row:       { id:'seated_row',       name:'坐姿划船器',     muscle:'背',   icon:'🚣' },
+  machine_shoulder: { id:'machine_shoulder', name:'肩部推舉訓練機', muscle:'肩',   icon:'🔝' },
+};
+
+function getEqInfo(eqId) {
+  return EQUIPMENT.find(e => e.id === eqId)
+      || SPECIAL_EQ[eqId]
+      || { id: eqId, name: eqId, muscle:'?', icon:'💪' }; // last resort, shouldn't happen
+}
+
+function getEqName(eqId)   { return getEqInfo(eqId).name; }
+function getEqMuscle(eqId) { return getEqInfo(eqId).muscle; }
+
+function getData() { try { return JSON.parse(localStorage.getItem('ironlog') || '[]'); } catch(e){ return []; } }
+function saveData(d) { localStorage.setItem('ironlog', JSON.stringify(d)); }
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function fmtDate(s) {
+  const d = new Date(s+'T00:00:00');
+  return `${d.getMonth()+1}月${d.getDate()}日`;
+}
+function fmtDateFull(s) {
+  const d = new Date(s+'T00:00:00');
+  const days = ['日','一','二','三','四','五','六'];
+  return `${d.getMonth()+1}/${d.getDate()} (${days[d.getDay()]})`;
+}
+
+// ── VIEWS ──
+function switchView(name, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'today') renderToday();
+  if (name === 'history') renderHistory();
+  if (name === 'progress') renderProgress();
+  if (name === 'equipment') renderEquipment();
+}
+
+// ── TODAY ──
+function renderToday() {
+  const data = getData();
+  const today = todayStr();
+  const todayData = data.filter(e => e.date === today);
+
+  // date
+  const d = new Date();
+  const days = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  document.getElementById('today-date-display').textContent =
+    `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${days[d.getDay()]}`;
+
+  // stats
+  const totalSets = todayData.reduce((a,e) => a + (e.type === 'cardio' ? 0 : (e.sets||0)), 0);
+  const totalVol  = todayData.reduce((a,e) => a + (e.type === 'cardio' ? 0 : (e.weight||0)*(e.sets||0)*(e.reps||0)), 0);
+  const eqSet = new Set(todayData.map(e => e.eqId));
+  document.getElementById('stat-sets').textContent = totalSets;
+  document.getElementById('stat-vol').textContent = totalVol >= 1000 ? (totalVol/1000).toFixed(1)+'K' : totalVol;
+  document.getElementById('stat-eq').textContent = eqSet.size;
+
+  const subEl = document.getElementById('today-sub-msg');
+  if (todayData.length === 0) {
+    subEl.textContent = '今天還沒有紀錄，按下方按鈕開始！';
+  } else {
+    subEl.textContent = `已訓練 ${eqSet.size} 個部位，繼續加油！`;
+  }
+
+  // list
+  const listEl = document.getElementById('today-list');
+  if (todayData.length === 0) {
+    listEl.innerHTML = `<div class="empty-state"><div class="icon">🏋️</div><p>今天還沒有訓練紀錄<br>加油！開始你的第一組</p></div>`;
+    return;
+  }
+
+  // separate cardio and strength
+  const cardioEntries = todayData.filter(e => e.type === 'cardio');
+  const strengthEntries = todayData.filter(e => e.type !== 'cardio');
+
+  // group strength by eq
+  const grouped = {};
+  strengthEntries.forEach(e => { if(!grouped[e.eqId]) grouped[e.eqId] = []; grouped[e.eqId].push(e); });
+
+  listEl.innerHTML = '';
+
+  // render cardio
+  cardioEntries.forEach(entry => {
+    const div = document.createElement('div');
+    div.className = 'set-entry cardio-entry';
+    div.innerHTML = `
+      <span class="set-muscle-tag" style="background:rgba(82,192,122,0.1);color:#52c07a;border:1px solid rgba(82,192,122,0.2);">有氧</span>
+      <div style="flex:1">
+        <div class="set-name">🏃 跑步機 <span class="cardio-badge">CARDIO</span></div>
+        <div class="set-detail">${entry.duration}分鐘${entry.distance ? ' · ' + entry.distance + 'km' : ''}${entry.speed ? ' · ' + entry.speed + 'km/h' : ''}${entry.cal ? ' · ' + entry.cal + 'kcal' : ''}</div>
+        ${entry.note ? `<div style="font-size:11px;color:var(--text3);margin-top:2px;">${entry.note}</div>` : ''}
+      </div>
+      <button class="set-delete" onclick="deleteEntry('${entry.id}')">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>`;
+    listEl.appendChild(div);
+  });
+
+  // render strength
+  Object.keys(grouped).forEach(eqId => {
+    const eq = getEqInfo(eqId);
+    const entries = grouped[eqId];
+    entries.forEach((entry, idx) => {
+      const isPR = checkPR(entry, data);
+      const div = document.createElement('div');
+      div.className = 'set-entry';
+      div.innerHTML = `
+        <span class="set-muscle-tag">${eq.muscle}</span>
+        <div style="flex:1">
+          <div class="set-name">${eq.name} <small style="color:var(--text3)">組${idx+1}</small>${isPR ? '<span class="pr-badge">PR</span>' : ''}</div>
+          <div class="set-detail">${entry.weight}kg × ${entry.sets}組 × ${entry.reps}下</div>
+          ${entry.note ? `<div style="font-size:11px;color:var(--text3);margin-top:2px;">${entry.note}</div>` : ''}
+        </div>
+        <button class="set-delete" onclick="deleteEntry('${entry.id}')">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>`;
+      listEl.appendChild(div);
+    });
+  });
+}
+
+function checkPR(entry, allData) {
+  if (entry.type === 'cardio' || entry.weight == null) return false;
+  const prev = allData.filter(e => e.eqId === entry.eqId && e.id !== entry.id && e.date < entry.date && e.type !== 'cardio' && e.weight != null);
+  if (prev.length === 0) return false;
+  const maxPrev = Math.max(...prev.map(e => e.weight));
+  return entry.weight > maxPrev;
+}
+
+function deleteEntry(id) {
+  if (!confirm('確定要刪除這筆紀錄？')) return;
+  const data = getData().filter(e => e.id !== id);
+  saveData(data);
+  renderToday();
+  showToast('已刪除');
+}
+
+// ── ADD MODAL ──
+function openAddModal(presetDate) {
+  // populate select
+  const sel = document.getElementById('eq-select');
+  sel.innerHTML = '<option value="">— 選擇器材 —</option>';
+  getAllEquipment().filter(e => !e.hidden).forEach(eq => {
+    const opt = document.createElement('option');
+    opt.value = eq.id;
+    opt.textContent = `${eq.muscle} | ${eq.name}`;
+    sel.appendChild(opt);
+  });
+  document.getElementById('inp-weight').value = '';
+  document.getElementById('inp-sets').value = '';
+  document.getElementById('inp-reps').value = '';
+  document.getElementById('inp-note').value = '';
+  document.getElementById('last-record-hint').textContent = '';
+  // Set date: use preset (from history page) or today
+  const dateVal = presetDate || todayStr();
+  document.getElementById('inp-date').value = dateVal;
+  onDateChange();
+  document.getElementById('add-overlay').classList.add('open');
+}
+
+function onDateChange() {
+  const val = document.getElementById('inp-date').value;
+  const today = todayStr();
+  const tag = document.getElementById('date-tag');
+  const titleEl = document.getElementById('modal-main-title');
+  if (!val || val === today) {
+    tag.textContent = '📅 今天';
+    titleEl.textContent = '新增組數';
+  } else {
+    tag.textContent = `⚠️ 補登：${fmtDate(val)}`;
+    titleEl.textContent = '補登組數';
+  }
+}
+
+function onEqChange() {
+  const eqId = document.getElementById('eq-select').value;
+  if (!eqId) { document.getElementById('last-record-hint').textContent = ''; return; }
+  const data = getData();
+  const prev = data.filter(e => e.eqId === eqId).sort((a,b) => b.date.localeCompare(a.date));
+  const hint = document.getElementById('last-record-hint');
+  if (prev.length > 0) {
+    const last = prev[0];
+    hint.textContent = `上次 (${fmtDate(last.date)}): ${last.weight}kg × ${last.sets}組 × ${last.reps}下`;
+    document.getElementById('inp-weight').value = last.weight;
+    document.getElementById('inp-sets').value = last.sets;
+    document.getElementById('inp-reps').value = last.reps;
+  } else {
+    hint.textContent = '首次使用這台器材 💪';
+  }
+}
+
+function saveSet() {
+  const eqId = document.getElementById('eq-select').value;
+  const weight = parseFloat(document.getElementById('inp-weight').value);
+  const sets = parseInt(document.getElementById('inp-sets').value);
+  const reps = parseInt(document.getElementById('inp-reps').value);
+  const note = document.getElementById('inp-note').value.trim();
+
+  if (!eqId) { showToast('請選擇器材'); return; }
+  if (isNaN(weight) || weight < 0) { showToast('請輸入重量'); return; }
+  if (isNaN(sets) || sets < 1) { showToast('請輸入組數'); return; }
+  if (isNaN(reps) || reps < 1) { showToast('請輸入次數'); return; }
+
+  const data = getData();
+  const entry = {
+    id: Date.now().toString(36) + Math.random().toString(36).substr(2,4),
+    date: document.getElementById('inp-date').value || todayStr(),
+    eqId, weight, sets, reps, note,
+    ts: Date.now()
+  };
+  data.push(entry);
+  saveData(data);
+  closeModal('add-overlay');
+  renderToday();
+  showToast(`✅ ${getEqName(eqId)} 已儲存`);
+
+  // Check if this eqId is already in ALL templates — only prompt if it's not in any
+  const tpls = getTemplates();
+  const allEqIds = getAllEquipment().map(e => e.id);
+  if (tpls.length > 0 && allEqIds.includes(eqId)) {
+    const eligible = tpls.filter(t => !t.eqIds.includes(eqId));
+    if (eligible.length > 0) {
+      showTplPrompt(eqId, eligible);
+    }
+  }
+}
+
+// ── HISTORY ──
+function renderHistory() {
+  const data = getData();
+  const byDate = {};
+  data.forEach(e => { if(!byDate[e.date]) byDate[e.date] = []; byDate[e.date].push(e); });
+  const dates = Object.keys(byDate).sort((a,b) => b.localeCompare(a));
+
+  const el = document.getElementById('history-content');
+  if (dates.length === 0) {
+    el.innerHTML = '<div class="empty-state" style="margin-top:40px;"><div class="icon">📋</div><p>還沒有任何訓練紀錄</p></div>';
+    return;
+  }
+
+  el.innerHTML = '';
+  dates.forEach(date => {
+    const entries = byDate[date];
+    const vol = entries.reduce((a,e) => a + (e.type === 'cardio' ? 0 : (e.weight||0)*(e.sets||0)*(e.reps||0)), 0);
+
+    // group by eq for this date
+    const grouped = {};
+    entries.forEach(e => { if(!grouped[e.eqId]) grouped[e.eqId] = []; grouped[e.eqId].push(e); });
+
+    const dayDiv = document.createElement('div');
+    dayDiv.className = 'history-day';
+    let html = `<div class="history-day-header">
+      <div class="history-day-date">${fmtDateFull(date)}</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="history-day-vol">總量 ${vol.toLocaleString()} kg</div>
+        <button class="btn-sm btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="openAddModal('${date}')">＋ 補登</button>
+      </div>
+    </div>`;
+
+    Object.keys(grouped).forEach(eqId => {
+      const eq = getEqInfo(eqId);
+      const sets = grouped[eqId];
+      html += `<div class="history-item">
+        <div class="history-item-top">
+          <div class="history-item-name">${getEqName(eqId)}</div>
+          <div style="font-size:11px;color:var(--text3)">${getEqMuscle(eqId)}</div>
+        </div>
+        <div class="history-item-sets">`;
+      sets.forEach(s => {
+        if (s.type === 'cardio') {
+          html += `<div class="history-set-chip" style="background:rgba(82,192,122,0.1);color:#52c07a;">🏃 ${s.duration}分${s.distance ? ' '+s.distance+'km' : ''}</div>`;
+        } else {
+          const isPR = checkPR(s, data);
+          html += `<div class="history-set-chip${isPR?' pr':''}">${s.weight}kg×${s.sets}×${s.reps}${isPR?' 🏆':''}</div>`;
+        }
+      });
+      html += `</div></div>`;
+    });
+
+    dayDiv.innerHTML = html;
+    el.appendChild(dayDiv);
+  });
+}
+
+// ── PROGRESS ──
+let progressChartInstance = null;
+
+function renderProgress() {
+  const data = getData();
+
+  // week vol strip
+  const strip = document.getElementById('week-vol-strip');
+  strip.innerHTML = '';
+  const dayLabels = ['日','一','二','三','四','五','六'];
+  const today = new Date();
+  const weekVols = [];
+  for (let i=6; i>=0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const dayEntries = data.filter(e => e.date === ds);
+    const vol = dayEntries.reduce((a,e) => a + (e.type === 'cardio' ? 0 : (e.weight||0)*(e.sets||0)*(e.reps||0)), 0);
+    weekVols.push({ label: dayLabels[d.getDay()], vol });
+  }
+  const maxVol = Math.max(...weekVols.map(w=>w.vol), 1);
+  weekVols.forEach(w => {
+    const div = document.createElement('div');
+    div.className = 'vol-day';
+    const pct = Math.round((w.vol / maxVol) * 100);
+    div.innerHTML = `<div class="vol-bar-wrap"><div class="vol-bar-inner" style="height:${Math.max(pct,3)}%"></div></div><div class="vol-day-lbl">${w.label}</div>`;
+    strip.appendChild(div);
+  });
+
+  // populate eq select for progress chart
+  const sel = document.getElementById('progress-eq-select');
+  const prev = sel.value;
+  const usedEqIds = [...new Set(data.filter(e => e.type !== 'cardio').map(e => e.eqId))];
+  sel.innerHTML = '<option value="">— 選擇器材 —</option>';
+  usedEqIds.forEach(id => {
+    const eq = getEqInfo(id);
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = `${eq.muscle} | ${eq.name}`;
+    sel.appendChild(opt);
+  });
+  if (prev) sel.value = prev;
+
+  renderProgressChart();
+  renderPRList(data);
+  renderWeightSection();
+}
+
+function renderProgressChart() {
+  const eqId = document.getElementById('progress-eq-select').value;
+  const canvas = document.getElementById('progress-chart');
+  const emptyEl = document.getElementById('progress-empty');
+
+  if (progressChartInstance) { progressChartInstance.destroy(); progressChartInstance = null; }
+
+  if (!eqId) { canvas.style.display='none'; emptyEl.style.display='block'; return; }
+  canvas.style.display='block'; emptyEl.style.display='none';
+
+  const data = getData().filter(e => e.eqId === eqId).sort((a,b) => a.date.localeCompare(b.date));
+  if (data.length === 0) { canvas.style.display='none'; emptyEl.style.display='block'; return; }
+
+  // max weight per day
+  const byDate = {};
+  data.forEach(e => { if(!byDate[e.date] || e.weight > byDate[e.date]) byDate[e.date] = e.weight; });
+
+  progressChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: Object.keys(byDate).map(d => fmtDate(d)),
+      datasets: [{
+        label: '最大重量 (kg)',
+        data: Object.values(byDate),
+        borderColor: '#f0a500',
+        backgroundColor: 'rgba(240,165,0,0.08)',
+        borderWidth: 2,
+        pointBackgroundColor: '#f0a500',
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        tension: 0.3, fill: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#666', font: { size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#666', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function renderPRList(data) {
+  const prEl = document.getElementById('pr-list');
+  const usedEqIds = [...new Set(data.filter(e => e.type !== 'cardio').map(e => e.eqId))];
+  if (usedEqIds.length === 0) {
+    prEl.innerHTML = '<div class="empty-state"><div class="icon">🏆</div><p>完成訓練後這裡會顯示你的最佳紀錄</p></div>';
+    return;
+  }
+  prEl.innerHTML = '';
+  usedEqIds.forEach(id => {
+    // Skip cardio entries (no weight data)
+    const strengthEntries = data.filter(e => e.eqId === id && e.type !== 'cardio' && e.weight != null);
+    if (strengthEntries.length === 0) return;
+    const maxWeight = Math.max(...strengthEntries.map(e => e.weight));
+    const prEntry = strengthEntries.find(e => e.weight === maxWeight);
+    if (!prEntry) return;
+    const div = document.createElement('div');
+    div.className = 'set-entry';
+    div.innerHTML = `
+      <span class="set-muscle-tag">${getEqMuscle(id)}</span>
+      <div class="set-name" style="flex:1">${getEqName(id)}</div>
+      <div style="text-align:right;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold)">${maxWeight}<small style="font-size:14px;"> kg</small></div>
+        <div style="font-size:10px;color:var(--text3)">${fmtDate(prEntry.date)}</div>
+      </div>`;
+    prEl.appendChild(div);
+  });
+}
+
+// ── EQUIPMENT ──
+let activeMuscleFiler = 'all';
+
+function renderEquipment() {
+  const allEq = getAllEquipment().filter(e => !e.hidden);
+  const muscles = ['all', ...new Set(allEq.map(e => e.muscle))];
+  const chipsEl = document.getElementById('muscle-filter-chips');
+  chipsEl.innerHTML = '';
+  muscles.forEach(m => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (m === activeMuscleFiler ? ' active' : '');
+    chip.textContent = m === 'all' ? '全部' : m;
+    chip.onclick = () => { activeMuscleFiler = m; renderEquipment(); };
+    chipsEl.appendChild(chip);
+  });
+
+  const filtered = activeMuscleFiler === 'all' ? allEq : allEq.filter(e => e.muscle === activeMuscleFiler);
+  const grid = document.getElementById('eq-grid');
+  grid.innerHTML = '';
+  const isBuiltInMap = {};
+  EQUIPMENT.forEach(e => isBuiltInMap[e.id] = true);
+  const customOverrides = getCustomEq().filter(e => e.isOverride).map(e => e.id);
+
+  filtered.forEach(eq => {
+    const isBuiltIn = !!isBuiltInMap[eq.id];
+    const isCustom = !isBuiltIn;
+    const isOverridden = customOverrides.includes(eq.id);
+
+    const card = document.createElement('div');
+    card.className = 'eq-card' + (isCustom ? ' custom-eq' : '');
+
+    const nameBadge = isCustom ? '<span class="custom-badge">自訂</span>' : (isOverridden ? '<span class="custom-badge">已編輯</span>' : '');
+
+    let actionsHtml = '';
+    if (eqManageMode) {
+      actionsHtml = `<div class="eq-card-actions" onclick="event.stopPropagation()">
+        <button class="eq-action-btn eq-btn-edit" onclick="openEqEditModal('${eq.id}')">✏️ 編輯</button>
+        ${isOverridden ? `<button class="eq-action-btn eq-btn-edit" onclick="resetEqOverride('${eq.id}')">↩ 還原</button>` : ''}
+        <button class="eq-action-btn eq-btn-del" onclick="deleteEqItem('${eq.id}')">${isBuiltIn ? '🙈 隱藏' : '🗑 刪除'}</button>
+      </div>`;
+    }
+
+    card.innerHTML = `<div class="eq-card-icon">${eq.icon}</div>
+      <div class="eq-card-muscle">${eq.muscle}</div>
+      <div class="eq-card-name">${eq.name}${nameBadge}</div>
+      <div class="eq-card-tip">${eq.tip || ''}</div>
+      ${actionsHtml}`;
+
+    card.onclick = () => {
+      if (eqManageMode) return;
+      switchView('today', document.querySelector('[data-view="today"]'));
+      setTimeout(() => {
+        openAddModal();
+        const sel = document.getElementById('eq-select');
+        sel.value = eq.id;
+        onEqChange();
+      }, 100);
+    };
+    grid.appendChild(card);
+  });
+}
+
+// ── REST TIMER ──
+let timerInterval = null;
+let timerTotal = 90;
+let timerLeft = 90;
+let timerRunning = false;
+
+function openRestTimer() {
+  document.getElementById('timer-overlay').classList.add('open');
+  resetTimer();
+}
+
+function setRestTime(secs) { timerTotal = secs; timerLeft = secs; updateTimerDisplay(); }
+
+function toggleTimer() {
+  if (timerRunning) {
+    clearInterval(timerInterval);
+    timerRunning = false;
+    document.getElementById('timer-start-btn').textContent = '繼續';
+  } else {
+    timerRunning = true;
+    document.getElementById('timer-start-btn').textContent = '暫停';
+    timerInterval = setInterval(() => {
+      timerLeft--;
+      updateTimerDisplay();
+      if (timerLeft <= 0) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+        document.getElementById('timer-start-btn').textContent = '開始';
+        if ('vibrate' in navigator) navigator.vibrate([200,100,200]);
+        showToast('⏰ 休息時間到！');
+      }
+    }, 1000);
+  }
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  timerLeft = timerTotal;
+  document.getElementById('timer-start-btn').textContent = '開始';
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(timerLeft / 60);
+  const s = timerLeft % 60;
+  document.getElementById('timer-text').textContent = `${m}:${String(s).padStart(2,'0')}`;
+  const circumf = 2 * Math.PI * 80;
+  const offset = circumf * (1 - timerLeft / timerTotal);
+  document.getElementById('timer-arc').style.strokeDashoffset = offset;
+}
+
+// ── UTILS ──
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function handleOverlayClick(e, id) { if (e.target.id === id) closeModal(id); }
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+
+
+// ── CUSTOM EQUIPMENT (localStorage) ──
+function getCustomEq()  { try { return JSON.parse(localStorage.getItem('ironlog_ceq') || '[]'); } catch(e){ return []; } }
+function saveCustomEq(d){ localStorage.setItem('ironlog_ceq', JSON.stringify(d)); }
+
+// Merge built-in + custom, with overrides applied
+function getAllEquipment() {
+  const custom = getCustomEq();
+  const overrides = {};
+  custom.filter(e => e.isOverride).forEach(e => overrides[e.id] = e);
+  const base = EQUIPMENT.map(e => overrides[e.id] ? {...e, ...overrides[e.id]} : e);
+  const newOnes = custom.filter(e => !e.isOverride);
+  return [...base, ...newOnes];
+}
+
+// Override getEqInfo to also check custom
+function getEqInfo(eqId) {
+  return getAllEquipment().find(e => e.id === eqId)
+      || SPECIAL_EQ[eqId]
+      || { id: eqId, name: eqId, muscle:'?', icon:'💪' };
+}
+
+let eqManageMode = false;
+
+function toggleEqManage() {
+  eqManageMode = !eqManageMode;
+  const btn = document.getElementById('eq-manage-btn');
+  if (btn) btn.textContent = eqManageMode ? '✅ 完成' : '✏️ 管理';
+  renderEquipment();
+}
+
+function openEqEditModal(eqId) {
+  const allEq = getAllEquipment();
+  const eq = eqId ? allEq.find(e => e.id === eqId) : null;
+  document.getElementById('eq-edit-title').textContent = eq ? '編輯器材' : '新增器材';
+  document.getElementById('eq-edit-name').value   = eq ? eq.name : '';
+  document.getElementById('eq-edit-muscle').value = eq ? eq.muscle : '胸';
+  document.getElementById('eq-edit-icon').value   = eq ? eq.icon : '💪';
+  document.getElementById('eq-edit-tip').value    = eq ? (eq.tip || '') : '';
+  document.getElementById('eq-edit-id').value     = eq ? eq.id : '';
+  document.getElementById('eq-edit-overlay').classList.add('open');
+}
+
+function saveEqEdit() {
+  const name   = document.getElementById('eq-edit-name').value.trim();
+  const muscle = document.getElementById('eq-edit-muscle').value;
+  const icon   = document.getElementById('eq-edit-icon').value.trim() || '💪';
+  const tip    = document.getElementById('eq-edit-tip').value.trim();
+  const editId = document.getElementById('eq-edit-id').value;
+
+  if (!name) { showToast('請輸入器材名稱'); return; }
+
+  const custom = getCustomEq();
+  const isBuiltIn = !!EQUIPMENT.find(e => e.id === editId);
+
+  if (editId) {
+    // Edit existing
+    if (isBuiltIn) {
+      // Save as override for built-in
+      const idx = custom.findIndex(e => e.id === editId && e.isOverride);
+      const override = { id: editId, name, muscle, icon, tip, isOverride: true };
+      if (idx >= 0) custom[idx] = override;
+      else custom.push(override);
+    } else {
+      // Edit custom equipment
+      const idx = custom.findIndex(e => e.id === editId);
+      if (idx >= 0) { custom[idx] = { ...custom[idx], name, muscle, icon, tip }; }
+    }
+  } else {
+    // New custom equipment
+    const newId = 'custom_' + Date.now().toString(36);
+    custom.push({ id: newId, name, muscle, icon, tip, isOverride: false });
+  }
+
+  saveCustomEq(custom);
+  closeModal('eq-edit-overlay');
+  renderEquipment();
+  // Refresh template modal checklist if open
+  showToast(editId ? `✅ 已更新「${name}」` : `✅ 已新增「${name}」`);
+}
+
+function deleteEqItem(eqId) {
+  const isBuiltIn = !!EQUIPMENT.find(e => e.id === eqId);
+  const eq = getEqInfo(eqId);
+
+  if (isBuiltIn) {
+    if (!confirm(`「${eq.name}」是內建器材，無法完全刪除。
+
+是否要從器材庫隱藏它？
+（歷史紀錄不受影響）`)) return;
+    const custom = getCustomEq();
+    const idx = custom.findIndex(e => e.id === eqId && e.isOverride);
+    const override = { id: eqId, name: eq.name, muscle: eq.muscle, icon: eq.icon, tip: eq.tip || '', isOverride: true, hidden: true };
+    if (idx >= 0) custom[idx] = override;
+    else custom.push(override);
+    saveCustomEq(custom);
+  } else {
+    if (!confirm(`確定要刪除「${eq.name}」嗎？\n（歷史紀錄不受影響）`)) return;
+    const custom = getCustomEq().filter(e => e.id !== eqId);
+    saveCustomEq(custom);
+  }
+  renderEquipment();
+  showToast('已刪除器材');
+}
+
+function resetEqOverride(eqId) {
+  const custom = getCustomEq().filter(e => !(e.id === eqId && e.isOverride));
+  saveCustomEq(custom);
+  renderEquipment();
+  showToast('已還原為預設值');
+}
+
+// ── CARDIO ──
+function openCardioModal() {
+  document.getElementById('cardio-date').value = todayStr();
+  document.getElementById('cardio-duration').value = '';
+  document.getElementById('cardio-distance').value = '';
+  document.getElementById('cardio-speed').value = '';
+  document.getElementById('cardio-cal').value = '';
+  document.getElementById('cardio-note').value = '';
+  document.getElementById('cardio-overlay').classList.add('open');
+}
+
+function saveCardio() {
+  const date = document.getElementById('cardio-date').value || todayStr();
+  const duration = parseFloat(document.getElementById('cardio-duration').value);
+  const distance = parseFloat(document.getElementById('cardio-distance').value) || 0;
+  const speed = parseFloat(document.getElementById('cardio-speed').value) || 0;
+  const cal = parseInt(document.getElementById('cardio-cal').value) || 0;
+  const note = document.getElementById('cardio-note').value.trim();
+  if (isNaN(duration) || duration < 1) { showToast('請輸入跑步時間'); return; }
+  const data = getData();
+  data.push({
+    id: Date.now().toString(36) + Math.random().toString(36).substr(2,4),
+    type: 'cardio', date, eqId: 'treadmill',
+    duration, distance, speed, cal, note, ts: Date.now()
+  });
+  saveData(data);
+  closeModal('cardio-overlay');
+  renderToday();
+  showToast(`✅ 跑步 ${duration} 分鐘已儲存`);
+}
+
+// ── TEMPLATE ──
+function getTemplates() { try { return JSON.parse(localStorage.getItem('ironlog_tpl') || '[]'); } catch(e){ return []; } }
+function saveTemplates(t) { localStorage.setItem('ironlog_tpl', JSON.stringify(t)); }
+
+function renderTodayTemplates() {
+  const tpls = getTemplates();
+  const row = document.getElementById('today-tpl-row');
+  row.innerHTML = '<div class="tpl-chip" onclick="openTplModal()" style="border-style:dashed;"><span>＋ 管理模板</span></div>';
+  tpls.forEach(tpl => {
+    const chip = document.createElement('div');
+    chip.className = 'tpl-chip';
+    chip.innerHTML = `<span onclick="applyTemplate('${tpl.id}')">${tpl.name}</span>`;
+    row.appendChild(chip);
+  });
+}
+
+function applyTemplate(tplId) {
+  const tpl = getTemplates().find(t => t.id === tplId);
+  if (!tpl || !tpl.eqIds.length) return;
+  const allData = getData();
+
+  // Set title & date
+  document.getElementById('tpl-apply-title').textContent = `📋 ${tpl.name}`;
+  document.getElementById('tpl-apply-date').value = todayStr();
+
+  // Build rows for each equipment
+  const listEl = document.getElementById('tpl-apply-list');
+  listEl.innerHTML = '';
+  tpl.eqIds.forEach(eqId => {
+    const eq = getEqInfo(eqId);
+
+    // Find last record for this equipment
+    const prev = allData.filter(e => e.eqId === eqId && e.type !== 'cardio')
+                        .sort((a,b) => b.date.localeCompare(a.date));
+    const last = prev[0];
+    const defWeight = last ? last.weight : '';
+    const defSets   = last ? last.sets   : '';
+    const defReps   = last ? last.reps   : '';
+    const hintText  = last ? `上次 ${fmtDate(last.date)}: ${last.weight}kg × ${last.sets}×${last.reps}` : '首次使用';
+
+    const row = document.createElement('div');
+    row.className = 'tpl-apply-row';
+    row.dataset.eqId = eqId;
+    row.dataset.skipped = 'false';
+    row.innerHTML = `
+      <div class="tpl-apply-row-header">
+        <div>
+          <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">${eq.muscle}</span>
+          <div class="tpl-apply-row-name">${eq.name}</div>
+          <div class="tpl-apply-row-hint">${hintText}</div>
+        </div>
+        <button class="tpl-apply-skip" onclick="toggleSkipRow(this)">跳過</button>
+      </div>
+      <div class="tpl-apply-inputs">
+        <div>
+          <input type="number" class="ta-weight" min="0" step="2.5" placeholder="kg" value="${defWeight}" />
+          <label>重量 (kg)</label>
+        </div>
+        <div>
+          <input type="number" class="ta-sets" min="1" step="1" placeholder="組" value="${defSets}" />
+          <label>組數</label>
+        </div>
+        <div>
+          <input type="number" class="ta-reps" min="1" step="1" placeholder="下" value="${defReps}" />
+          <label>次數</label>
+        </div>
+      </div>`;
+    listEl.appendChild(row);
+  });
+
+  document.getElementById('tpl-apply-overlay').classList.add('open');
+}
+
+function toggleSkipRow(btn) {
+  const row = btn.closest('.tpl-apply-row');
+  const skipped = row.dataset.skipped === 'true';
+  row.dataset.skipped = skipped ? 'false' : 'true';
+  btn.textContent = skipped ? '跳過' : '已跳過';
+  btn.classList.toggle('skipped', !skipped);
+  row.querySelectorAll('input').forEach(inp => {
+    inp.disabled = !skipped;
+    inp.style.opacity = !skipped ? '0.3' : '1';
+  });
+}
+
+function saveTemplateAll() {
+  const date = document.getElementById('tpl-apply-date').value || todayStr();
+  const rows = document.querySelectorAll('#tpl-apply-list .tpl-apply-row');
+  const allData = getData();
+  let savedCount = 0;
+  let errors = [];
+
+  rows.forEach(row => {
+    if (row.dataset.skipped === 'true') return;
+    const eqId   = row.dataset.eqId;
+    const weight = parseFloat(row.querySelector('.ta-weight').value);
+    const sets   = parseInt(row.querySelector('.ta-sets').value);
+    const reps   = parseInt(row.querySelector('.ta-reps').value);
+    if (isNaN(weight) || isNaN(sets) || isNaN(reps)) {
+      errors.push(getEqName(eqId));
+      return;
+    }
+    allData.push({
+      id: Date.now().toString(36) + Math.random().toString(36).substr(2,4) + savedCount,
+      date, eqId, weight, sets, reps, note: '', ts: Date.now() + savedCount
+    });
+    savedCount++;
+  });
+
+  if (errors.length > 0) {
+    showToast(`⚠️ 請填寫：${errors.slice(0,2).join('、')}${errors.length>2?'…':''}`);
+    return;
+  }
+  if (savedCount === 0) { showToast('所有項目都被跳過了'); return; }
+
+  saveData(allData);
+  closeModal('tpl-apply-overlay');
+  renderToday();
+  showToast(`✅ 已儲存 ${savedCount} 台器材的紀錄`);
+}
+
+function openTplModal() {
+  renderTplEditList();
+  // populate checklist
+  const cl = document.getElementById('tpl-eq-checklist');
+  cl.innerHTML = '';
+  getAllEquipment().filter(e => !e.hidden).forEach(eq => {
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm);cursor:pointer;font-size:13px;';
+    lbl.innerHTML = `<input type="checkbox" value="${eq.id}" style="accent-color:var(--gold);width:16px;height:16px;"> ${eq.muscle} | ${eq.name}`;
+    cl.appendChild(lbl);
+  });
+  document.getElementById('tpl-name-inp').value = '';
+  document.getElementById('tpl-overlay').classList.add('open');
+}
+
+function renderTplEditList() {
+  const tpls = getTemplates();
+  const el = document.getElementById('tpl-list-edit');
+  if (tpls.length === 0) { el.innerHTML = '<div style="font-size:13px;color:var(--text3);padding:8px 0;">還沒有模板，在下方建立第一個吧！</div>'; return; }
+  el.innerHTML = '';
+  tpls.forEach(tpl => {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);';
+    div.innerHTML = `
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:600;">${tpl.name}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px;">${tpl.eqIds.map(id => getEqName(id)).join('、')}</div>
+      </div>
+      <button class="btn-sm btn-danger" style="padding:6px 12px;font-size:12px;" onclick="deleteTpl('${tpl.id}')">刪除</button>`;
+    el.appendChild(div);
+  });
+}
+
+function saveTpl() {
+  const name = document.getElementById('tpl-name-inp').value.trim();
+  if (!name) { showToast('請輸入模板名稱'); return; }
+  const checked = [...document.querySelectorAll('#tpl-eq-checklist input:checked')].map(i => i.value);
+  if (checked.length === 0) { showToast('請至少選擇一台器材'); return; }
+  const tpls = getTemplates();
+  tpls.push({ id: Date.now().toString(36), name, eqIds: checked });
+  saveTemplates(tpls);
+  renderTplEditList();
+  renderTodayTemplates();
+  document.getElementById('tpl-name-inp').value = '';
+  document.querySelectorAll('#tpl-eq-checklist input').forEach(i => i.checked = false);
+  showToast(`✅ 模板「${name}」已儲存`);
+}
+
+function deleteTpl(id) {
+  if (!confirm('確定刪除這個模板？')) return;
+  saveTemplates(getTemplates().filter(t => t.id !== id));
+  renderTplEditList();
+  renderTodayTemplates();
+  showToast('已刪除模板');
+}
+
+// ── WEIGHT ──
+function getWeights() { try { return JSON.parse(localStorage.getItem('ironlog_weight') || '[]'); } catch(e){ return []; } }
+function saveWeights(w) { localStorage.setItem('ironlog_weight', JSON.stringify(w)); }
+
+let weightChartInstance = null;
+
+function saveWeight() {
+  const val = parseFloat(document.getElementById('inp-weight-log').value);
+  if (isNaN(val) || val < 20 || val > 300) { showToast('請輸入有效體重'); return; }
+  const weights = getWeights();
+  const today = todayStr();
+  const existing = weights.findIndex(w => w.date === today);
+  if (existing >= 0) { weights[existing].val = val; } 
+  else { weights.push({ date: today, val }); }
+  weights.sort((a,b) => a.date.localeCompare(b.date));
+  saveWeights(weights);
+  document.getElementById('inp-weight-log').value = '';
+  renderWeightSection();
+  showToast(`⚖️ 體重 ${val} kg 已記錄`);
+}
+
+function renderWeightSection() {
+  const weights = getWeights();
+  const listEl = document.getElementById('weight-list');
+  const canvas = document.getElementById('weight-chart');
+  if (!listEl || !canvas) return;
+
+  if (weightChartInstance) { weightChartInstance.destroy(); weightChartInstance = null; }
+
+  if (weights.length === 0) {
+    canvas.style.display = 'none';
+    listEl.innerHTML = '<div class="empty-state"><div class="icon">⚖️</div><p>輸入今日體重開始追蹤</p></div>';
+    return;
+  }
+  canvas.style.display = 'block';
+
+  // Chart
+  weightChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: weights.map(w => fmtDate(w.date)),
+      datasets: [{
+        label: '體重 (kg)',
+        data: weights.map(w => w.val),
+        borderColor: '#52c07a',
+        backgroundColor: 'rgba(82,192,122,0.08)',
+        borderWidth: 2, pointBackgroundColor: '#52c07a',
+        pointRadius: 4, tension: 0.3, fill: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#666', font: { size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#666', font: { size: 11 } } }
+      }
+    }
+  });
+
+  // List (last 7)
+  const recent = [...weights].reverse().slice(0, 7);
+  listEl.innerHTML = '';
+  recent.forEach((w, i) => {
+    const prev = recent[i+1];
+    let diffHtml = '';
+    if (prev) {
+      const diff = (w.val - prev.val).toFixed(1);
+      if (diff > 0) diffHtml = `<span class="weight-diff-up">▲ ${diff}</span>`;
+      else if (diff < 0) diffHtml = `<span class="weight-diff-down">▼ ${Math.abs(diff)}</span>`;
+      else diffHtml = `<span style="font-size:11px;color:var(--text3)">— 持平</span>`;
+    }
+    const div = document.createElement('div');
+    div.className = 'weight-strip';
+    div.innerHTML = `
+      <div class="weight-date">${fmtDateFull(w.date)}</div>
+      <div class="weight-val">${w.val}<small style="font-size:14px;"> kg</small></div>
+      ${diffHtml}
+      <button class="set-delete" onclick="deleteWeight('${w.date}')">
+        <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      </button>`;
+    listEl.appendChild(div);
+  });
+}
+
+function deleteWeight(date) {
+  saveWeights(getWeights().filter(w => w.date !== date));
+  renderWeightSection();
+  showToast('已刪除體重紀錄');
+}
+
+
+// ── CSV IMPORT ──
+let importParsed = null; // { training: [], weights: [] }
+
+function openImportModal() {
+  importParsed = null;
+  document.getElementById('import-file-input').value = '';
+  document.getElementById('import-preview').style.display = 'none';
+  document.getElementById('import-confirm-btn').style.display = 'none';
+  document.getElementById('import-drop-zone').style.borderColor = 'var(--border)';
+  document.getElementById('import-overlay').classList.add('open');
+}
+
+function handleFileDrop(e) {
+  e.preventDefault();
+  document.getElementById('import-drop-zone').style.borderColor = 'var(--border)';
+  const file = e.dataTransfer.files[0];
+  if (file) parseCSVFile(file);
+}
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) parseCSVFile(file);
+}
+
+function parseCSVFile(file) {
+  if (!file.name.endsWith('.csv')) { showToast('請選擇 .csv 檔案'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const result = parseIronLogCSV(e.target.result);
+      importParsed = result;
+      showImportPreview(result);
+    } catch(err) {
+      showToast('CSV 格式錯誤，請使用本 App 匯出的檔案');
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseIronLogCSV(raw) {
+  // Strip BOM
+  const text = raw.replace(/^\uFEFF/, '');
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+
+  const training = [];
+  const weights  = [];
+  let mode = 'training'; // 'training' or 'weight'
+
+  // Find header line
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Switch to weight mode when we hit the weight section
+    if (line === '日期,體重(kg)') { mode = 'weight'; i++; continue; }
+
+    // Skip header rows
+    if (line.startsWith('日期,類型') || line === '') { i++; continue; }
+
+    const cols = parseCSVLine(line);
+    if (!cols || cols.length < 2) { i++; continue; }
+
+    if (mode === 'weight') {
+      const date = cols[0], val = parseFloat(cols[1]);
+      if (date && !isNaN(val)) weights.push({ date, val });
+    } else {
+      // Training row: 日期,類型,器材/動作,肌群,重量,組數,次數,訓練量,時間,距離,均速,卡路里,備註
+      const [date, type, eqName, , weight, sets, reps, , duration, distance, speed, cal, note] = cols;
+      if (!date || !type) { i++; continue; }
+
+      // Match eqName back to an eqId
+      const allEq = getAllEquipment();
+      const matched = allEq.find(e => e.name === eqName);
+      // Also check SPECIAL_EQ
+      const specialMatch = Object.values(SPECIAL_EQ).find(e => e.name === eqName);
+      const eqId = matched?.id || specialMatch?.id || null;
+      if (!eqId) { i++; continue; } // skip unrecognised equipment
+
+      if (type === '有氧') {
+        training.push({
+          type: 'cardio', date, eqId,
+          duration: parseFloat(duration)||0,
+          distance: parseFloat(distance)||0,
+          speed:    parseFloat(speed)||0,
+          cal:      parseInt(cal)||0,
+          note:     note||''
+        });
+      } else {
+        const w = parseFloat(weight), s = parseInt(sets), r = parseInt(reps);
+        if (!isNaN(w) && !isNaN(s) && !isNaN(r)) {
+          training.push({ date, eqId, weight:w, sets:s, reps:r, note:note||'' });
+        }
+      }
+    }
+    i++;
+  }
+  return { training, weights };
+}
+
+function parseCSVLine(line) {
+  // Handle quoted fields
+  const cols = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === ',' && !inQ) {
+      cols.push(cur.trim()); cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  cols.push(cur.trim());
+  return cols;
+}
+
+function showImportPreview(result) {
+  const existing = getData();
+  const existingWeights = getWeights();
+
+  // De-duplicate check
+  const newTraining = result.training.filter(n => {
+    if (n.type === 'cardio') {
+      return !existing.some(e => e.type==='cardio' && e.date===n.date && e.eqId===n.eqId && e.duration===n.duration);
+    }
+    return !existing.some(e => e.date===n.date && e.eqId===n.eqId && e.weight===n.weight && e.sets===n.sets && e.reps===n.reps);
+  });
+  const newWeights = result.weights.filter(n => !existingWeights.some(e => e.date===n.date));
+
+  importParsed._newTraining = newTraining;
+  importParsed._newWeights  = newWeights;
+
+  // Stats
+  const statsEl = document.getElementById('import-stats');
+  statsEl.innerHTML = [
+    ['重訓紀錄', newTraining.filter(e=>e.type!=='cardio').length],
+    ['有氧紀錄', newTraining.filter(e=>e.type==='cardio').length],
+    ['體重紀錄', newWeights.length],
+  ].map(([lbl,num]) => `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--gold)">${num}</div>
+      <div style="font-size:11px;color:var(--text3)">${lbl}</div>
+    </div>`).join('');
+
+  // Sample
+  const total = newTraining.length + newWeights.length;
+  const sampleEl = document.getElementById('import-sample');
+  if (total === 0) {
+    sampleEl.textContent = '沒有新資料（可能全部已存在）';
+  } else {
+    const samples = newTraining.slice(0,5).map(e =>
+      e.type === 'cardio'
+        ? `${e.date} 跑步機 ${e.duration}分`
+        : `${e.date} ${getEqName(e.eqId)} ${e.weight}kg×${e.sets}×${e.reps}`
+    );
+    sampleEl.innerHTML = samples.join('<br>') + (newTraining.length > 5 ? `<br>... 共 ${total} 筆` : '');
+  }
+
+  document.getElementById('import-preview').style.display = 'block';
+  document.getElementById('import-confirm-btn').style.display = total > 0 ? 'block' : 'none';
+  if (total === 0) showToast('CSV 內的資料已全部存在，無需重複匯入');
+}
+
+function confirmImport() {
+  if (!importParsed) return;
+  const { _newTraining, _newWeights } = importParsed;
+
+  // Add IDs and timestamps to new training entries
+  const existing = getData();
+  _newTraining.forEach((e, i) => {
+    e.id = 'imp_' + Date.now().toString(36) + i;
+    e.ts = Date.now() + i;
+  });
+  saveData([...existing, ..._newTraining]);
+
+  // Merge weights
+  const existingW = getWeights();
+  const merged = [...existingW, ..._newWeights].sort((a,b) => a.date.localeCompare(b.date));
+  saveWeights(merged);
+
+  closeModal('import-overlay');
+  renderToday();
+  renderHistory();
+  showToast(`✅ 已匯入 ${_newTraining.length} 筆訓練、${_newWeights.length} 筆體重`);
+  importParsed = null;
+}
+
+// ── EXPORT CSV ──
+function exportCSV() {
+  const data = getData();
+  const weights = getWeights();
+  if (data.length === 0 && weights.length === 0) { showToast('還沒有任何資料可匯出'); return; }
+
+  let csv = '\uFEFF'; // BOM for Excel UTF-8
+  csv += '日期,類型,器材/動作,肌群,重量(kg),組數,次數,訓練量,時間(分),距離(km),均速(km/h),卡路里,備註\n';
+
+  // strength entries
+  data.forEach(e => {
+    if (e.type === 'cardio') {
+      csv += `${e.date},有氧,${getEqName(e.eqId)},,,,,,${e.duration||''},${e.distance||''},${e.speed||''},${e.cal||''},"${(e.note||'').replace(/"/g,'""')}"\n`;
+    } else {
+      const vol = (e.weight||0) * (e.sets||0) * (e.reps||0);
+      csv += `${e.date},重訓,${getEqName(e.eqId)},${getEqMuscle(e.eqId)},${e.weight||''},${e.sets||''},${e.reps||''},${vol},,,,,"${(e.note||'').replace(/"/g,'""')}"\n`;
+    }
+  });
+
+  // weight entries  
+  if (weights.length > 0) {
+    csv += '\n日期,體重(kg)\n';
+    weights.forEach(w => { csv += `${w.date},${w.val}\n`; });
+  }
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `鐵人日誌_${todayStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ CSV 已下載');
+}
+
+
+// ── ADD-TO-TEMPLATE PROMPT ──
+let promptDismissTimer = null;
+
+function showTplPrompt(eqId, eligibleTpls) {
+  const titleEl = document.getElementById('tpl-prompt-title');
+  const chipsEl = document.getElementById('tpl-prompt-chips');
+  titleEl.textContent = `➕ 將「${getEqName(eqId)}」加入模板？`;
+  chipsEl.innerHTML = '';
+
+  eligibleTpls.forEach(tpl => {
+    const chip = document.createElement('div');
+    chip.className = 'tpl-prompt-chip';
+    chip.textContent = tpl.name;
+    chip.onclick = () => addEqToTemplate(eqId, tpl.id);
+    chipsEl.appendChild(chip);
+  });
+
+  const prompt = document.getElementById('tpl-prompt');
+  prompt.classList.add('show');
+
+  // Auto-dismiss after 6 seconds
+  clearTimeout(promptDismissTimer);
+  promptDismissTimer = setTimeout(dismissTplPrompt, 6000);
+}
+
+function addEqToTemplate(eqId, tplId) {
+  const tpls = getTemplates();
+  const tpl = tpls.find(t => t.id === tplId);
+  if (!tpl) return;
+  if (!tpl.eqIds.includes(eqId)) {
+    tpl.eqIds.push(eqId);
+    saveTemplates(tpls);
+    showToast(`✅ 已加入「${tpl.name}」`);
+  }
+  dismissTplPrompt();
+}
+
+function dismissTplPrompt() {
+  clearTimeout(promptDismissTimer);
+  document.getElementById('tpl-prompt').classList.remove('show');
+}
+
+// ── INIT ──
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('splash').classList.add('hidden');
+    document.getElementById('app').classList.add('visible');
+    renderToday();
+    renderEquipment();
+    renderTodayTemplates();
+  }, 1600);
+});
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+
+<!-- ADD TO TEMPLATE PROMPT -->
+<div class="tpl-prompt" id="tpl-prompt">
+  <div class="tpl-prompt-title" id="tpl-prompt-title">➕ 要將這台器材加入模板嗎？</div>
+  <div class="tpl-prompt-chips" id="tpl-prompt-chips"></div>
+  <div class="tpl-prompt-dismiss" onclick="dismissTplPrompt()">不用，謝謝</div>
+</div>
+</body>
+</html>
