@@ -268,6 +268,48 @@
     .vol-bar-inner { width: 100%; background: var(--gold); border-radius: 3px 3px 0 0; min-height: 3px; transition: height 0.4s ease; }
     .vol-day-lbl { font-size: 9px; color: var(--text3); }
 
+
+    /* ── PROGRESSIVE OVERLOAD ── */
+    .overload-box {
+      border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 14px;
+      display: none;
+    }
+    .overload-box.show { display: block; }
+    .overload-up   { background: rgba(82,192,122,0.12); border: 1px solid rgba(82,192,122,0.3); }
+    .overload-same { background: rgba(240,165,0,0.10);  border: 1px solid rgba(240,165,0,0.3); }
+    .overload-down { background: rgba(224,82,82,0.10);  border: 1px solid rgba(224,82,82,0.25); }
+    .overload-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
+    .overload-up   .overload-title { color: #52c07a; }
+    .overload-same .overload-title { color: var(--gold); }
+    .overload-down .overload-title { color: var(--red); }
+    .overload-body { font-size: 13px; color: var(--text2); line-height: 1.6; }
+    .overload-target { font-size: 13px; font-weight: 600; margin-top: 4px; }
+    .overload-up   .overload-target { color: #52c07a; }
+    .overload-same .overload-target { color: var(--gold); }
+
+    /* ── MUSCLE BALANCE ── */
+    .muscle-balance-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .muscle-balance-row:last-child { border-bottom: none; }
+    .muscle-balance-name { width: 48px; font-size: 12px; color: var(--text2); flex-shrink: 0; }
+    .muscle-balance-bar-wrap { flex: 1; height: 8px; background: var(--surface3); border-radius: 4px; overflow: hidden; }
+    .muscle-balance-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+    .muscle-balance-count { font-size: 11px; color: var(--text3); width: 36px; text-align: right; flex-shrink: 0; }
+    .muscle-alert { font-size: 12px; color: var(--red); padding: 8px 12px; background: rgba(224,82,82,0.08); border-radius: var(--radius-sm); border: 1px solid rgba(224,82,82,0.2); margin-top: 8px; }
+
+    /* ── WEEKLY REPORT ── */
+    .report-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 12px; }
+    .report-stat { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 8px; text-align: center; }
+    .report-stat-num { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: var(--gold); line-height: 1; }
+    .report-stat-lbl { font-size: 10px; color: var(--text3); margin-top: 3px; }
+    .report-highlight { padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 8px; font-size: 13px; line-height: 1.7; }
+    .report-highlight.good { background: rgba(82,192,122,0.1); border: 1px solid rgba(82,192,122,0.2); color: #52c07a; }
+    .report-highlight.warn { background: rgba(240,165,0,0.1);  border: 1px solid rgba(240,165,0,0.2);  color: var(--gold); }
+    .report-week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .report-week-label { font-size: 13px; color: var(--text2); }
+    .report-nav-btn { background: var(--surface3); border: none; color: var(--text2); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; }
     /* ── EQUIPMENT VIEW ── */
     .eq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px; }
     .eq-card {
@@ -499,6 +541,19 @@
         <div id="pr-list"></div>
       </div>
       <div class="card">
+        <div class="card-title">本週肌群平衡</div>
+        <div id="muscle-balance-content"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:10px;">訓練週報</div>
+        <div class="report-week-nav">
+          <button class="report-nav-btn" onclick="shiftReportWeek(-1)">‹ 上週</button>
+          <div class="report-week-label" id="report-week-label"></div>
+          <button class="report-nav-btn" onclick="shiftReportWeek(1)">下週 ›</button>
+        </div>
+        <div id="report-content"></div>
+      </div>
+      <div class="card">
         <div class="card-title" style="margin-bottom:8px;">體重紀錄</div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
           <input type="number" id="inp-weight-log" min="30" max="200" step="0.1" placeholder="今日體重 kg"
@@ -565,7 +620,13 @@
         <option value="">— 選擇器材 —</option>
       </select>
     </div>
-    <div id="last-record-hint" class="input-hint" style="margin-top: -8px; margin-bottom: 12px; color: var(--gold);"></div>
+    <div id="last-record-hint" class="input-hint" style="margin-top: -8px; margin-bottom: 8px; color: var(--gold);"></div>
+
+    <div class="overload-box" id="overload-box">
+      <div class="overload-title" id="overload-title"></div>
+      <div class="overload-body" id="overload-body"></div>
+      <div class="overload-target" id="overload-target"></div>
+    </div>
 
     <div class="row3">
       <div class="form-group">
@@ -1015,6 +1076,7 @@ function onEqChange() {
   } else {
     hint.textContent = '首次使用這台器材 💪';
   }
+  updateOverloadBox(eqId);
 }
 
 function saveSet() {
@@ -1155,6 +1217,8 @@ function renderProgress() {
   renderProgressChart();
   renderPRList(data);
   renderWeightSection();
+  renderMuscleBalance(data);
+  renderWeeklyReport(data);
 }
 
 function renderProgressChart() {
@@ -2035,6 +2099,244 @@ function addEqToTemplate(eqId, tplId) {
 function dismissTplPrompt() {
   clearTimeout(promptDismissTimer);
   document.getElementById('tpl-prompt').classList.remove('show');
+}
+
+
+// ── PROGRESSIVE OVERLOAD ──
+function calcOverload(eqId, allData) {
+  const history = allData
+    .filter(e => e.eqId === eqId && e.type !== 'cardio' && e.weight != null)
+    .sort((a,b) => b.date.localeCompare(a.date));
+  if (history.length === 0) return null;
+
+  // Get last session (most recent date)
+  const lastDate = history[0].date;
+  const lastSession = history.filter(e => e.date === lastDate);
+
+  // Best set from last session: highest volume = weight * reps
+  const lastBest = lastSession.reduce((best, e) =>
+    (e.weight * e.reps > best.weight * best.reps) ? e : best, lastSession[0]);
+
+  // Check if there are 2+ sessions for trend
+  const prevSessions = history.filter(e => e.date < lastDate);
+  let trend = null;
+  if (prevSessions.length > 0) {
+    const prevDate = prevSessions[0].date;
+    const prevSession = history.filter(e => e.date === prevDate);
+    const prevBest = prevSession.reduce((best, e) =>
+      (e.weight * e.reps > best.weight * best.reps) ? e : best, prevSession[0]);
+    const lastVol = lastBest.weight * lastBest.reps;
+    const prevVol = prevBest.weight * prevBest.reps;
+    if (lastVol > prevVol) trend = 'up';
+    else if (lastVol === prevVol) trend = 'same';
+    else trend = 'down';
+  }
+
+  // Suggestion: try adding 2.5kg or 1 more rep
+  const suggestWeight = lastBest.weight + 2.5;
+  const suggestReps   = lastBest.reps + 1;
+
+  return { lastBest, lastDate, trend, suggestWeight, suggestReps };
+}
+
+function updateOverloadBox(eqId) {
+  const box   = document.getElementById('overload-box');
+  const title = document.getElementById('overload-title');
+  const body  = document.getElementById('overload-body');
+  const tgt   = document.getElementById('overload-target');
+
+  if (!eqId) { box.className = 'overload-box'; return; }
+
+  const allData = getData();
+  const ol = calcOverload(eqId, allData);
+  if (!ol) { box.className = 'overload-box'; return; }
+
+  const { lastBest, lastDate, trend, suggestWeight, suggestReps } = ol;
+
+  box.classList.add('show');
+
+  if (trend === 'up') {
+    box.className = 'overload-box show overload-up';
+    title.textContent = '📈 上次有進步！繼續挑戰';
+    body.textContent  = `上次 (${fmtDate(lastDate)}): ${lastBest.weight}kg × ${lastBest.reps}下`;
+    tgt.textContent   = `建議目標：${suggestWeight}kg × ${lastBest.reps}下 或 ${lastBest.weight}kg × ${suggestReps}下`;
+  } else if (trend === 'same') {
+    box.className = 'overload-box show overload-same';
+    title.textContent = '💪 持平，試著突破！';
+    body.textContent  = `上次 (${fmtDate(lastDate)}): ${lastBest.weight}kg × ${lastBest.reps}下`;
+    tgt.textContent   = `建議目標：${suggestWeight}kg × ${lastBest.reps}下 或 ${lastBest.weight}kg × ${suggestReps}下`;
+  } else if (trend === 'down') {
+    box.className = 'overload-box show overload-down';
+    title.textContent = '⚠️ 上次有退步，今天重新出發';
+    body.textContent  = `上次 (${fmtDate(lastDate)}): ${lastBest.weight}kg × ${lastBest.reps}下`;
+    tgt.textContent   = '';
+  } else {
+    // Only one session, no trend yet
+    box.className = 'overload-box show overload-same';
+    title.textContent = '🏁 首次記錄，建立基準';
+    body.textContent  = `上次 (${fmtDate(lastDate)}): ${lastBest.weight}kg × ${lastBest.reps}下`;
+    tgt.textContent   = `建議目標：${suggestWeight}kg × ${lastBest.reps}下 或 ${lastBest.weight}kg × ${suggestReps}下`;
+  }
+}
+
+// ── MUSCLE BALANCE ──
+function renderMuscleBalance(data) {
+  const el = document.getElementById('muscle-balance-content');
+  if (!el) return;
+
+  // Get this week's strength entries
+  const today = new Date();
+  const weekDates = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    weekDates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+  }
+
+  const weekData = data.filter(e => weekDates.includes(e.date) && e.type !== 'cardio');
+  const muscleCount = {};
+  weekData.forEach(e => {
+    const m = getEqMuscle(e.eqId);
+    muscleCount[m] = (muscleCount[m] || 0) + (e.sets || 1);
+  });
+
+  const muscles = ['胸','背','腿','肩','手臂','核心'];
+  const maxCount = Math.max(...muscles.map(m => muscleCount[m] || 0), 1);
+
+  if (Object.keys(muscleCount).length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">⚖️</div><p>本週還沒有訓練紀錄</p></div>';
+    return;
+  }
+
+  const colors = { '胸':'#f0a500','背':'#52c07a','腿':'#5296c0','肩':'#c052a0','手臂':'#c07852','核心':'#a052c0' };
+  let html = '';
+  muscles.forEach(m => {
+    const count = muscleCount[m] || 0;
+    const pct   = Math.round((count / maxCount) * 100);
+    const color = colors[m] || '#888';
+    html += `<div class="muscle-balance-row">
+      <div class="muscle-balance-name">${m}</div>
+      <div class="muscle-balance-bar-wrap">
+        <div class="muscle-balance-bar" style="width:${pct}%;background:${color};"></div>
+      </div>
+      <div class="muscle-balance-count">${count > 0 ? count + '組' : '—'}</div>
+    </div>`;
+  });
+
+  // Alert for neglected muscle groups (0 sets this week)
+  const neglected = muscles.filter(m => !muscleCount[m]);
+  if (neglected.length > 0 && Object.keys(muscleCount).length >= 2) {
+    html += `<div class="muscle-alert">⚠️ 本週尚未訓練：${neglected.join('、')}</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ── WEEKLY REPORT ──
+let reportWeekOffset = 0; // 0 = this week, -1 = last week
+
+function shiftReportWeek(dir) {
+  reportWeekOffset += dir;
+  if (reportWeekOffset > 0) reportWeekOffset = 0; // can't go to future
+  renderWeeklyReport(getData());
+}
+
+function getWeekDates(offset) {
+  const today = new Date();
+  const dates = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i - (offset * -1 * 7));
+    dates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+  }
+  return dates;
+}
+
+function renderWeeklyReport(data) {
+  const el    = document.getElementById('report-content');
+  const label = document.getElementById('report-week-label');
+  if (!el || !label) return;
+
+  const weekDates = getWeekDates(reportWeekOffset);
+  const start = fmtDate(weekDates[0]);
+  const end   = fmtDate(weekDates[6]);
+  label.textContent = reportWeekOffset === 0 ? `本週 ${start} — ${end}` : `${start} — ${end}`;
+
+  const weekData = data.filter(e => weekDates.includes(e.date));
+  const strength = weekData.filter(e => e.type !== 'cardio');
+  const cardio   = weekData.filter(e => e.type === 'cardio');
+
+  if (weekData.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>這週沒有訓練紀錄</p></div>';
+    return;
+  }
+
+  // Stats
+  const trainDays  = new Set(weekData.map(e => e.date)).size;
+  const totalSets  = strength.reduce((a,e) => a + (e.sets||0), 0);
+  const totalVol   = strength.reduce((a,e) => a + (e.weight||0)*(e.sets||0)*(e.reps||0), 0);
+  const totalCardio = cardio.reduce((a,e) => a + (e.duration||0), 0);
+
+  // PRs this week
+  const prs = strength.filter(e => checkPR(e, data));
+
+  // Best performer (most volume by equipment)
+  const eqVol = {};
+  strength.forEach(e => {
+    const vol = (e.weight||0)*(e.sets||0)*(e.reps||0);
+    eqVol[e.eqId] = (eqVol[e.eqId]||0) + vol;
+  });
+  const bestEqId  = Object.keys(eqVol).sort((a,b) => eqVol[b]-eqVol[a])[0];
+
+  // Compare to previous week
+  const prevDates  = getWeekDates(reportWeekOffset - 1 < 0 ? reportWeekOffset - 1 : -1);
+  const prevStrength = data.filter(e => prevDates.includes(e.date) && e.type !== 'cardio');
+  const prevVol    = prevStrength.reduce((a,e) => a + (e.weight||0)*(e.sets||0)*(e.reps||0), 0);
+  const volChange  = prevVol > 0 ? Math.round(((totalVol - prevVol) / prevVol) * 100) : null;
+
+  let html = `<div class="report-grid">
+    <div class="report-stat"><div class="report-stat-num">${trainDays}</div><div class="report-stat-lbl">訓練天數</div></div>
+    <div class="report-stat"><div class="report-stat-num">${totalSets}</div><div class="report-stat-lbl">總組數</div></div>
+    <div class="report-stat"><div class="report-stat-num">${totalVol>=1000?(totalVol/1000).toFixed(1)+'K':totalVol}</div><div class="report-stat-lbl">訓練量 kg</div></div>
+  </div>`;
+
+  // Volume vs last week
+  if (volChange !== null) {
+    const isGood = volChange >= 0;
+    html += `<div class="report-highlight ${isGood?'good':'warn'}">
+      ${isGood ? '📈' : '📉'} 訓練量比上週${isGood?'增加':'減少'} ${Math.abs(volChange)}%
+      ${!isGood ? '（休息也是訓練的一部分！）' : '，繼續保持！'}
+    </div>`;
+  }
+
+  // PRs
+  if (prs.length > 0) {
+    html += `<div class="report-highlight good">
+      🏆 本週創下 ${prs.length} 個個人最佳紀錄！<br>
+      ${prs.slice(0,3).map(e => `${getEqName(e.eqId)} ${e.weight}kg`).join('、')}${prs.length>3?'…':''}
+    </div>`;
+  }
+
+  // Cardio
+  if (totalCardio > 0) {
+    html += `<div class="report-highlight warn">🏃 有氧訓練：共 ${totalCardio} 分鐘</div>`;
+  }
+
+  // Best equipment
+  if (bestEqId) {
+    html += `<div style="font-size:12px;color:var(--text3);padding:4px 0;">
+      💪 本週訓練量最多：${getEqName(bestEqId)}（${eqVol[bestEqId].toLocaleString()} kg）
+    </div>`;
+  }
+
+  // Muscle groups trained
+  const muscles = [...new Set(strength.map(e => getEqMuscle(e.eqId)))];
+  if (muscles.length > 0) {
+    html += `<div style="font-size:12px;color:var(--text3);padding:4px 0;">
+      🎯 訓練部位：${muscles.join('、')}
+    </div>`;
+  }
+
+  el.innerHTML = html;
 }
 
 // ── INIT ──
