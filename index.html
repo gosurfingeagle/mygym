@@ -554,6 +554,22 @@
         <div id="report-content"></div>
       </div>
       <div class="card">
+        <div class="card-title" style="margin-bottom:8px;">訓練量 vs 體重趨勢</div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;" id="combo-period-btns">
+          <button class="chip active" id="combo-btn-4" onclick="setComboRange(4,this)">4週</button>
+          <button class="chip" id="combo-btn-8"  onclick="setComboRange(8,this)">8週</button>
+          <button class="chip" id="combo-btn-12" onclick="setComboRange(12,this)">12週</button>
+        </div>
+        <div class="chart-wrap" style="margin-bottom:6px;"><canvas id="combo-chart"></canvas></div>
+        <div style="display:flex;gap:16px;justify-content:center;padding:4px 0 2px;font-size:11px;color:var(--text3);">
+          <span><span style="display:inline-block;width:10px;height:3px;background:#f0a500;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>訓練量 (kg)</span>
+          <span><span style="display:inline-block;width:10px;height:3px;background:#52c07a;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>體重 (kg)</span>
+        </div>
+        <div id="combo-empty" class="empty-state" style="display:none;">
+          <div class="icon">📊</div><p>同時記錄訓練和體重後<br>這裡會顯示對比圖</p>
+        </div>
+      </div>
+      <div class="card">
         <div class="card-title" style="margin-bottom:8px;">體重紀錄</div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
           <input type="number" id="inp-weight-log" min="30" max="200" step="0.1" placeholder="今日體重 kg"
@@ -1760,6 +1776,7 @@ function saveWeight() {
   saveWeights(weights);
   document.getElementById('inp-weight-log').value = '';
   renderWeightSection();
+  renderComboChart();
   showToast(`⚖️ 體重 ${val} kg 已記錄`);
 }
 
@@ -2177,6 +2194,163 @@ function updateOverloadBox(eqId) {
     body.textContent  = `上次 (${fmtDate(lastDate)}): ${lastBest.weight}kg × ${lastBest.reps}下`;
     tgt.textContent   = `建議目標：${suggestWeight}kg × ${lastBest.reps}下 或 ${lastBest.weight}kg × ${suggestReps}下`;
   }
+}
+
+
+// ── COMBO CHART (訓練量 vs 體重) ──
+let comboChartInstance = null;
+let comboWeeks = 4;
+
+function setComboRange(weeks, btn) {
+  comboWeeks = weeks;
+  document.querySelectorAll('#combo-period-btns .chip').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderComboChart();
+}
+
+function renderComboChart() {
+  const canvas  = document.getElementById('combo-chart');
+  const emptyEl = document.getElementById('combo-empty');
+  if (!canvas || !emptyEl) return;
+
+  if (comboChartInstance) { comboChartInstance.destroy(); comboChartInstance = null; }
+
+  const allData  = getData();
+  const weights  = getWeights();
+
+  // Build weekly buckets going back comboWeeks weeks
+  const today = new Date();
+  const buckets = []; // { label, weekStart, weekEnd, vol, weight }
+
+  for (let w = comboWeeks - 1; w >= 0; w--) {
+    const endD   = new Date(today);
+    endD.setDate(today.getDate() - w * 7);
+    const startD = new Date(endD);
+    startD.setDate(endD.getDate() - 6);
+
+    const toStr = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const startStr = toStr(startD);
+    const endStr   = toStr(endD);
+
+    // Weekly volume: strength + cardio (cardio: 1 min = approx 6 kg equivalent for display scaling)
+    const weekStrength = allData.filter(e => e.date >= startStr && e.date <= endStr && e.type !== 'cardio');
+    const weekCardio   = allData.filter(e => e.date >= startStr && e.date <= endStr && e.type === 'cardio');
+    const strengthVol  = weekStrength.reduce((a,e) => a + (e.weight||0)*(e.sets||0)*(e.reps||0), 0);
+    const cardioVol    = weekCardio.reduce((a,e) => a + (e.duration||0) * 6, 0); // convert mins to ~kg equivalent
+    const totalVol     = strengthVol + cardioVol;
+
+    // Nearest weight record in that week (or most recent before it)
+    const weekWeights  = weights.filter(wt => wt.date >= startStr && wt.date <= endStr);
+    const weightVal    = weekWeights.length > 0
+      ? weekWeights[weekWeights.length - 1].val
+      : null;
+
+    // Label: show month/day of week start
+    const label = `${startD.getMonth()+1}/${startD.getDate()}`;
+    buckets.push({ label, vol: totalVol, weight: weightVal });
+  }
+
+  const hasVol    = buckets.some(b => b.vol > 0);
+  const hasWeight = buckets.some(b => b.weight !== null);
+
+  if (!hasVol && !hasWeight) {
+    canvas.style.display = 'none';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  canvas.style.display = 'block';
+  emptyEl.style.display = 'none';
+
+  const labels   = buckets.map(b => b.label);
+  const volData   = buckets.map(b => b.vol || 0);
+  const wtData    = buckets.map(b => b.weight); // null = no data point
+
+  const datasets = [];
+
+  if (hasVol) {
+    datasets.push({
+      label: '訓練量 (kg)',
+      data: volData,
+      borderColor: '#f0a500',
+      backgroundColor: 'rgba(240,165,0,0.08)',
+      borderWidth: 2,
+      pointBackgroundColor: '#f0a500',
+      pointRadius: 3,
+      tension: 0.3,
+      fill: true,
+      yAxisID: 'yVol',
+    });
+  }
+
+  if (hasWeight) {
+    datasets.push({
+      label: '體重 (kg)',
+      data: wtData,
+      borderColor: '#52c07a',
+      backgroundColor: 'rgba(82,192,122,0.0)',
+      borderWidth: 2,
+      pointBackgroundColor: '#52c07a',
+      pointRadius: wt => wt.raw !== null ? 4 : 0,
+      tension: 0.3,
+      fill: false,
+      yAxisID: 'yWeight',
+      spanGaps: true, // connect across null gaps
+    });
+  }
+
+  const scales = {
+    x: {
+      grid: { color: 'rgba(255,255,255,0.04)' },
+      ticks: { color: '#666', font: { size: 10 } }
+    }
+  };
+
+  if (hasVol) {
+    scales.yVol = {
+      type: 'linear', position: 'left',
+      grid: { color: 'rgba(255,255,255,0.04)' },
+      ticks: {
+        color: '#f0a500', font: { size: 10 },
+        callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v
+      },
+      title: { display: false }
+    };
+  }
+
+  if (hasWeight) {
+    scales.yWeight = {
+      type: 'linear', position: 'right',
+      grid: { drawOnChartArea: false },
+      ticks: { color: '#52c07a', font: { size: 10 } },
+      title: { display: false }
+    };
+  }
+
+  comboChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              if (ctx.raw === null) return null;
+              if (ctx.dataset.yAxisID === 'yVol') {
+                const v = ctx.raw;
+                return ` 訓練量：${v >= 1000 ? (v/1000).toFixed(1)+'K' : v} kg`;
+              }
+              return ` 體重：${ctx.raw} kg`;
+            }
+          }
+        }
+      },
+      scales
+    }
+  });
 }
 
 // ── MUSCLE BALANCE ──
