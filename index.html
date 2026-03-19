@@ -579,6 +579,13 @@
         <div class="chart-wrap" style="margin-bottom:12px;"><canvas id="weight-chart"></canvas></div>
         <div id="weight-list"></div>
       </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:8px;">自動備份紀錄</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px;line-height:1.6;">
+          每天有訓練的日子晚上 23:59 自動備份，保留最近 7 天。
+        </div>
+        <div id="backup-list"></div>
+      </div>
     </div>
   </div>
 
@@ -2513,6 +2520,107 @@ function renderWeeklyReport(data) {
   el.innerHTML = html;
 }
 
+
+// ── AUTO BACKUP ──
+// 每天有訓練紀錄時，在晚上 23:59:50 自動備份一次
+
+function getBackups() {
+  try { return JSON.parse(localStorage.getItem('ironlog_backup') || '[]'); } catch(e) { return []; }
+}
+function saveBackups(b) { localStorage.setItem('ironlog_backup', JSON.stringify(b)); }
+
+function runAutoBackup() {
+  const today = todayStr();
+  const data  = getData();
+
+  // 只在今天有訓練紀錄時才備份
+  const todayHasData = data.some(e => e.date === today);
+  if (!todayHasData) return;
+
+  // 避免同一天重複備份
+  const backups = getBackups();
+  if (backups.some(b => b.date === today)) return;
+
+  const weights = getWeights();
+  const snapshot = {
+    date:      today,
+    savedAt:   new Date().toISOString(),
+    training:  data,
+    weights:   weights,
+    templates: JSON.parse(localStorage.getItem('ironlog_tpl')  || '[]'),
+    customEq:  JSON.parse(localStorage.getItem('ironlog_ceq')  || '[]'),
+  };
+
+  // 保留最近 7 天的備份，避免佔用太多空間
+  const updated = [...backups, snapshot].slice(-7);
+  saveBackups(updated);
+  console.log(`[鐵人日誌] 自動備份完成 ${today}`);
+}
+
+function restoreFromBackup(backupDate) {
+  const backups = getBackups();
+  const bk = backups.find(b => b.date === backupDate);
+  if (!bk) { showToast('找不到該備份'); return; }
+  if (!confirm(`確定要還原 ${backupDate} 的備份？\n現有資料將被覆蓋。`)) return;
+
+  saveData(bk.training);
+  saveWeights(bk.weights);
+  if (bk.templates) localStorage.setItem('ironlog_tpl', JSON.stringify(bk.templates));
+  if (bk.customEq)  localStorage.setItem('ironlog_ceq', JSON.stringify(bk.customEq));
+
+  renderToday();
+  renderTodayTemplates();
+  showToast(`✅ 已還原 ${backupDate} 的備份（${bk.training.length} 筆訓練）`);
+}
+
+function scheduleAutoBackup() {
+  const now     = new Date();
+  const target  = new Date(now);
+  target.setHours(23, 59, 50, 0); // 晚上 23:59:50
+
+  // 如果現在已超過今天的備份時間，排程明天
+  if (now >= target) {
+    target.setDate(target.getDate() + 1);
+  }
+
+  const msUntil = target - now;
+  setTimeout(() => {
+    runAutoBackup();
+    scheduleAutoBackup(); // 備份後排程下一次
+  }, msUntil);
+
+  const h = Math.floor(msUntil / 3600000);
+  const m = Math.floor((msUntil % 3600000) / 60000);
+  console.log(`[鐵人日誌] 下次自動備份排程於 ${h}小時${m}分後`);
+}
+
+// 顯示備份清單（在設定/進步頁呼叫）
+function renderBackupList() {
+  const el = document.getElementById('backup-list');
+  if (!el) return;
+  const backups = getBackups();
+  if (backups.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px 0;">還沒有備份紀錄</div>';
+    return;
+  }
+  el.innerHTML = '';
+  [...backups].reverse().forEach(bk => {
+    const div = document.createElement('div');
+    div.className = 'weight-strip';
+    div.innerHTML = `
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:500;">${bk.date}</div>
+        <div style="font-size:11px;color:var(--text3);">
+          ${bk.training.length} 筆訓練・${bk.weights.length} 筆體重・
+          備份於 ${bk.savedAt.slice(11,16)}
+        </div>
+      </div>
+      <button class="btn-sm btn-ghost" style="font-size:11px;padding:6px 10px;"
+        onclick="restoreFromBackup('${bk.date}')">還原</button>`;
+    el.appendChild(div);
+  });
+}
+
 // ── INIT ──
 window.addEventListener('load', () => {
   setTimeout(() => {
@@ -2521,6 +2629,7 @@ window.addEventListener('load', () => {
     renderToday();
     renderEquipment();
     renderTodayTemplates();
+    scheduleAutoBackup();
   }, 1600);
 });
 
