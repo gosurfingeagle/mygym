@@ -400,9 +400,25 @@
     }
     .tpl-apply-row-name { font-size:14px; font-weight:600; }
     .tpl-apply-row-hint { font-size:11px; color:var(--gold); }
-    .tpl-apply-skip { font-size:11px; color:var(--text3); cursor:pointer; padding:4px 8px;
-      border:1px solid var(--border); border-radius:4px; background:none; }
-    .tpl-apply-skip.skipped { color:var(--red); border-color:rgba(224,82,82,0.4); background:rgba(224,82,82,0.08); }
+    .tpl-apply-save-btn {
+      padding:8px 14px; border-radius:6px; border:1px solid var(--gold-dim);
+      background:var(--gold-glow); color:var(--gold);
+      font-family:'Noto Sans TC',sans-serif; font-size:12px; font-weight:600;
+      cursor:pointer; white-space:nowrap; transition:all 0.15s;
+    }
+    .tpl-apply-save-btn:active { opacity:0.7; }
+    .tpl-apply-row.done {
+      opacity:0.5;
+      background:rgba(82,192,122,0.05);
+      border-color:rgba(82,192,122,0.2);
+    }
+    .tpl-apply-row.done .tpl-apply-inputs input { pointer-events:none; }
+    .tpl-apply-done-badge {
+      font-size:11px; color:#52c07a;
+      border:1px solid rgba(82,192,122,0.3);
+      padding:3px 8px; border-radius:4px;
+      background:rgba(82,192,122,0.1);
+    }
     .tpl-apply-inputs { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
     .tpl-apply-inputs input {
       width:100%; padding:10px 10px; text-align:center;
@@ -744,7 +760,7 @@
     <div class="modal-handle"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
       <div class="modal-title" id="tpl-apply-title" style="margin-bottom:0;">套用模板</div>
-      <div style="font-size:12px;color:var(--text2);">確認後一次儲存</div>
+      <div id="tpl-apply-progress" style="font-size:12px;color:var(--text2);"></div>
     </div>
     <div class="form-group" style="margin-bottom:16px;">
       <label class="form-label">訓練日期</label>
@@ -752,8 +768,7 @@
         style="width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'Noto Sans TC',sans-serif;font-size:14px;outline:none;color-scheme:dark;" />
     </div>
     <div id="tpl-apply-list"></div>
-    <button class="save-btn" onclick="saveTemplateAll()">💾 全部儲存</button>
-    <button class="btn-sm btn-ghost" style="width:100%;margin-bottom:16px;margin-top:6px;" onclick="closeModal('tpl-apply-overlay')">取消</button>
+    <button class="btn-sm btn-ghost" style="width:100%;margin-bottom:16px;margin-top:8px;" onclick="closeTplApply()">完成並關閉</button>
   </div>
 </div>
 
@@ -1612,17 +1627,15 @@ function applyTemplate(tplId) {
   if (!tpl || !tpl.eqIds.length) return;
   const allData = getData();
 
-  // Set title & date
   document.getElementById('tpl-apply-title').textContent = `📋 ${tpl.name}`;
   document.getElementById('tpl-apply-date').value = todayStr();
+  updateTplProgress();
 
-  // Build rows for each equipment
   const listEl = document.getElementById('tpl-apply-list');
   listEl.innerHTML = '';
+
   tpl.eqIds.forEach(eqId => {
     const eq = getEqInfo(eqId);
-
-    // Find last record for this equipment
     const prev = allData.filter(e => e.eqId === eqId && e.type !== 'cardio')
                         .sort((a,b) => b.date.localeCompare(a.date));
     const last = prev[0];
@@ -1631,20 +1644,22 @@ function applyTemplate(tplId) {
     const defReps   = last ? last.reps   : '';
     const hintText  = last ? `上次 ${fmtDate(last.date)}: ${last.weight}kg × ${last.sets}×${last.reps}` : '首次使用';
 
+    const rowId = 'tpl-row-' + eqId;
     const row = document.createElement('div');
     row.className = 'tpl-apply-row';
+    row.id = rowId;
     row.dataset.eqId = eqId;
-    row.dataset.skipped = 'false';
+    row.dataset.done = 'false';
     row.innerHTML = `
       <div class="tpl-apply-row-header">
         <div>
           <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">${eq.muscle}</span>
           <div class="tpl-apply-row-name">${eq.name}</div>
-          <div class="tpl-apply-row-hint">${hintText}</div>
+          <div class="tpl-apply-row-hint" id="${rowId}-hint">${hintText}</div>
         </div>
-        <button class="tpl-apply-skip" onclick="toggleSkipRow(this)">跳過</button>
+        <button class="tpl-apply-save-btn" id="${rowId}-btn" onclick="saveTplRow('${rowId}')">儲存</button>
       </div>
-      <div class="tpl-apply-inputs">
+      <div class="tpl-apply-inputs" id="${rowId}-inputs">
         <div>
           <input type="number" class="ta-weight" min="0" step="2.5" placeholder="kg" value="${defWeight}" />
           <label>重量 (kg)</label>
@@ -1664,52 +1679,64 @@ function applyTemplate(tplId) {
   document.getElementById('tpl-apply-overlay').classList.add('open');
 }
 
-function toggleSkipRow(btn) {
-  const row = btn.closest('.tpl-apply-row');
-  const skipped = row.dataset.skipped === 'true';
-  row.dataset.skipped = skipped ? 'false' : 'true';
-  btn.textContent = skipped ? '跳過' : '已跳過';
-  btn.classList.toggle('skipped', !skipped);
-  row.querySelectorAll('input').forEach(inp => {
-    inp.disabled = !skipped;
-    inp.style.opacity = !skipped ? '0.3' : '1';
+function saveTplRow(rowId) {
+  const row    = document.getElementById(rowId);
+  if (!row || row.dataset.done === 'true') return;
+
+  const eqId   = row.dataset.eqId;
+  const date   = document.getElementById('tpl-apply-date').value || todayStr();
+  const weight = parseFloat(row.querySelector('.ta-weight').value);
+  const sets   = parseInt(row.querySelector('.ta-sets').value);
+  const reps   = parseInt(row.querySelector('.ta-reps').value);
+
+  if (isNaN(weight) || weight < 0) { showToast('請輸入重量'); return; }
+  if (isNaN(sets)   || sets < 1)   { showToast('請輸入組數'); return; }
+  if (isNaN(reps)   || reps < 1)   { showToast('請輸入次數'); return; }
+
+  // Save to storage
+  const allData = getData();
+  allData.push({
+    id: Date.now().toString(36) + Math.random().toString(36).substr(2,5),
+    date, eqId, weight, sets, reps, note: '', ts: Date.now()
   });
+  saveData(allData);
+
+  // Mark row as done
+  row.dataset.done = 'true';
+  row.classList.add('done');
+
+  const btn = document.getElementById(rowId + '-btn');
+  if (btn) {
+    btn.outerHTML = `<span class="tpl-apply-done-badge">✅ 已儲存</span>`;
+  }
+
+  const hint = document.getElementById(rowId + '-hint');
+  if (hint) hint.textContent = `已記錄：${weight}kg × ${sets}組 × ${reps}下`;
+
+  // Disable inputs
+  row.querySelectorAll('input').forEach(inp => { inp.disabled = true; });
+
+  renderToday();
+  updateTplProgress();
+  showToast(`✅ ${getEqName(eqId)} 已儲存`);
 }
 
-function saveTemplateAll() {
-  const date = document.getElementById('tpl-apply-date').value || todayStr();
-  const rows = document.querySelectorAll('#tpl-apply-list .tpl-apply-row');
-  const allData = getData();
-  let savedCount = 0;
-  let errors = [];
-
-  rows.forEach(row => {
-    if (row.dataset.skipped === 'true') return;
-    const eqId   = row.dataset.eqId;
-    const weight = parseFloat(row.querySelector('.ta-weight').value);
-    const sets   = parseInt(row.querySelector('.ta-sets').value);
-    const reps   = parseInt(row.querySelector('.ta-reps').value);
-    if (isNaN(weight) || isNaN(sets) || isNaN(reps)) {
-      errors.push(getEqName(eqId));
-      return;
-    }
-    allData.push({
-      id: Date.now().toString(36) + Math.random().toString(36).substr(2,4) + savedCount,
-      date, eqId, weight, sets, reps, note: '', ts: Date.now() + savedCount
-    });
-    savedCount++;
-  });
-
-  if (errors.length > 0) {
-    showToast(`⚠️ 請填寫：${errors.slice(0,2).join('、')}${errors.length>2?'…':''}`);
-    return;
+function updateTplProgress() {
+  const rows  = document.querySelectorAll('#tpl-apply-list .tpl-apply-row');
+  const done  = [...rows].filter(r => r.dataset.done === 'true').length;
+  const total = rows.length;
+  const el    = document.getElementById('tpl-apply-progress');
+  if (el && total > 0) {
+    el.textContent = `${done} / ${total} 完成`;
+    el.style.color = done === total ? '#52c07a' : 'var(--text2)';
   }
-  if (savedCount === 0) { showToast('所有項目都被跳過了'); return; }
+}
 
-  saveData(allData);
+function closeTplApply() {
+  const rows = document.querySelectorAll('#tpl-apply-list .tpl-apply-row');
+  const done = [...rows].filter(r => r.dataset.done === 'true').length;
   closeModal('tpl-apply-overlay');
-  renderToday();
-  showToast(`✅ 已儲存 ${savedCount} 台器材的紀錄`);
+  if (done > 0) showToast(`✅ 共完成 ${done} 台器材`);
 }
 
 function openTplModal() {
