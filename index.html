@@ -349,6 +349,88 @@
 
 
 
+
+    /* ── AI COACH ── */
+    .ai-chat-wrap {
+      display:flex; flex-direction:column;
+      height:calc(100vh - var(--nav-h) - var(--safe-bottom) - 60px);
+      padding: 0;
+    }
+    .ai-messages {
+      flex:1; overflow-y:auto; padding:12px 16px;
+      display:flex; flex-direction:column; gap:12px;
+    }
+    .ai-msg {
+      max-width:88%; padding:12px 14px;
+      border-radius:14px; font-size:14px; line-height:1.7;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);} }
+    .ai-msg.user {
+      align-self:flex-end;
+      background:var(--gold-glow); border:1px solid var(--gold-dim);
+      color:var(--text);
+    }
+    .ai-msg.coach {
+      align-self:flex-start;
+      background:var(--surface2); border:1px solid var(--border);
+      color:var(--text);
+    }
+    .ai-msg.coach .coach-label {
+      font-size:10px; color:var(--gold); font-weight:700;
+      letter-spacing:1.5px; text-transform:uppercase; margin-bottom:6px;
+    }
+    .ai-msg.thinking {
+      align-self:flex-start;
+      background:var(--surface2); border:1px solid var(--border);
+      color:var(--text3); font-size:13px; padding:10px 14px;
+    }
+    .ai-typing-dot {
+      display:inline-block; width:6px; height:6px;
+      border-radius:50%; background:var(--text3); margin:0 2px;
+      animation:blink 1.2s infinite;
+    }
+    .ai-typing-dot:nth-child(2){animation-delay:0.2s;}
+    .ai-typing-dot:nth-child(3){animation-delay:0.4s;}
+    @keyframes blink{0%,80%,100%{opacity:0.2;}40%{opacity:1;}}
+    .ai-input-row {
+      display:flex; gap:8px; padding:10px 16px 10px;
+      background:var(--surface); border-top:1px solid var(--border);
+    }
+    .ai-input {
+      flex:1; padding:12px 14px;
+      background:var(--surface2); border:1px solid var(--border);
+      border-radius:24px; color:var(--text);
+      font-family:'Noto Sans TC',sans-serif; font-size:14px;
+      outline:none; resize:none; max-height:100px; overflow-y:auto;
+      line-height:1.5;
+    }
+    .ai-input:focus { border-color:var(--gold); }
+    .ai-send-btn {
+      width:44px; height:44px; border-radius:50%;
+      background:var(--gold); border:none; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0; transition:opacity 0.15s; align-self:flex-end;
+    }
+    .ai-send-btn:active { opacity:0.7; }
+    .ai-send-btn svg { width:18px; height:18px; stroke:#000; fill:none; stroke-width:2.5; stroke-linecap:round; }
+    .ai-quick-btns {
+      display:flex; gap:8px; overflow-x:auto; padding:0 16px 10px;
+      -ms-overflow-style:none; scrollbar-width:none;
+    }
+    .ai-quick-btns::-webkit-scrollbar { display:none; }
+    .ai-quick-btn {
+      padding:7px 14px; border-radius:20px; white-space:nowrap;
+      background:var(--surface); border:1px solid var(--border);
+      color:var(--text2); font-size:12px; cursor:pointer;
+      transition:all 0.15s; flex-shrink:0;
+    }
+    .ai-quick-btn:active { background:var(--gold-glow); border-color:var(--gold); color:var(--gold); }
+    .ai-setup-card {
+      margin:16px; padding:16px;
+      background:var(--surface2); border:1px solid var(--border);
+      border-radius:var(--radius);
+    }
     /* ── EQUIPMENT EDIT ── */
     .eq-card-actions {
       display:flex; gap:6px; margin-top:10px; padding-top:8px;
@@ -608,6 +690,53 @@
     </div>
   </div>
 
+  <!-- AI COACH VIEW -->
+  <div class="view" id="view-coach">
+    <div class="topbar">
+      <div class="topbar-title">AI 教練</div>
+      <button class="btn-sm btn-ghost" style="font-size:11px;" onclick="clearCoachChat()">清除對話</button>
+    </div>
+
+    <!-- API Key 設定區（未設定時顯示） -->
+    <div id="coach-setup" style="display:none;">
+      <div class="ai-setup-card">
+        <div style="font-size:14px;font-weight:600;color:var(--gold);margin-bottom:8px;">🔑 設定 API Key</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:12px;">
+          AI 教練使用 Claude API，需要輸入 Anthropic API Key 才能使用。<br>
+          Key 只存在你的手機本地，不會上傳到任何伺服器。
+        </div>
+        <input type="password" id="coach-api-key-inp"
+          placeholder="AIza..."
+          style="width:100%;padding:12px 14px;background:var(--surface3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:monospace;font-size:13px;outline:none;margin-bottom:10px;" />
+        <button class="save-btn" onclick="saveCoachApiKey()">儲存並開始使用</button>
+        <div style="font-size:11px;color:var(--text3);margin-top:10px;line-height:1.7;">
+          前往 <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--gold)">Google AI Studio</a>
+          → 點「Get API Key」→「Create API Key」
+        </div>
+      </div>
+    </div>
+
+    <!-- 聊天介面 -->
+    <div id="coach-chat" style="display:none;flex-direction:column;height:calc(100vh - var(--nav-h) - var(--safe-bottom) - 60px);">
+      <div class="ai-messages" id="ai-messages"></div>
+      <div class="ai-quick-btns" id="ai-quick-btns">
+        <div class="ai-quick-btn" onclick="sendQuick('分析我本週的訓練')">📊 本週分析</div>
+        <div class="ai-quick-btn" onclick="sendQuick('我哪個肌群需要加強？')">💪 肌群建議</div>
+        <div class="ai-quick-btn" onclick="sendQuick('幫我設計下次訓練計畫')">📋 訓練計畫</div>
+        <div class="ai-quick-btn" onclick="sendQuick('我的重量進步如何？')">📈 進步分析</div>
+        <div class="ai-quick-btn" onclick="sendQuick('有什麼建議可以突破瓶頸？')">🚀 突破瓶頸</div>
+        <div class="ai-quick-btn" onclick="sendQuick('幫我評估休息是否足夠')">😴 恢復評估</div>
+      </div>
+      <div class="ai-input-row">
+        <textarea class="ai-input" id="ai-input" placeholder="問教練任何問題..." rows="1"
+          onkeydown="handleAiKeydown(event)" oninput="autoResizeAiInput(this)"></textarea>
+        <button class="ai-send-btn" onclick="sendCoachMessage()">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- EQUIPMENT VIEW -->
   <div class="view" id="view-equipment">
     <div class="topbar">
@@ -640,6 +769,10 @@
     <button class="nav-btn" data-view="equipment" onclick="switchView('equipment',this)">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
       <span>器材庫</span>
+    </button>
+    <button class="nav-btn" data-view="coach" onclick="switchView('coach',this)">
+      <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"/><path d="M12 6v6l4 2"/></svg>
+      <span>AI教練</span>
     </button>
   </nav>
 </div>
@@ -884,38 +1017,38 @@
 // ── DATA ──
 const EQUIPMENT = [
   // ── 胸 ──
-  { id:'chest_press',   name:'胸部推舉機',   muscle:'胸',  icon:'💪', tip:'保持背部貼靠椅背，呼吸穩定推出' },
-  { id:'chest_machine', name:'胸推訓練機',   muscle:'胸',  icon:'🔲', tip:'手肘與肩同高，推出時完全伸展，感受胸肌用力' },
+  { id:'chest_press',   name:'胸部推舉機',   muscle:'胸',  icon:'🫁', tip:'保持背部貼靠椅背，呼吸穩定推出' },
+  { id:'chest_machine', name:'胸推訓練機',   muscle:'胸',  icon:'🤜', tip:'手肘與肩同高，推出時完全伸展，感受胸肌用力' },
   { id:'pec_fly',       name:'蝴蝶機',       muscle:'胸',  icon:'🦋', tip:'手肘微彎固定，夾胸時想像抱一棵大樹，頂點停頓感受胸肌' },
-  { id:'cable_cross',   name:'繩索夾胸',     muscle:'胸',  icon:'🔀', tip:'手肘微彎，從肩膀主導而非手臂' },
+  { id:'cable_cross',   name:'繩索夾胸',     muscle:'胸',  icon:'✂️', tip:'手肘微彎，從肩膀主導而非手臂' },
   // ── 背 ──
   { id:'lat_pull',      name:'滑輪下拉機',   muscle:'背',  icon:'⬇️', tip:'挺胸，將槓桿拉至下巴位置' },
-  { id:'high_pull_back',name:'高拉背部訓練機',muscle:'背', icon:'⬆️', tip:'挺胸收緊核心，以背闊肌發力向下拉，手肘往腰側收，頂點停頓1秒再緩慢回程' },
+  { id:'high_pull_back',name:'高拉背部訓練機',muscle:'背', icon:'🏹', tip:'挺胸收緊核心，以背闊肌發力向下拉，手肘往腰側收，頂點停頓1秒再緩慢回程' },
   { id:'row_machine',   name:'坐姿划船機',   muscle:'背',  icon:'🚣', tip:'收縮肩胛骨，停頓後緩慢回程' },
-  { id:'dual_cable_row',name:'雙軸低拉划船機',muscle:'背', icon:'🔃', tip:'雙手同時拉向腰側，收緊肩胛骨後停頓，回程緩慢保持張力' },
+  { id:'dual_cable_row',name:'雙軸低拉划船機',muscle:'背', icon:'🔗', tip:'雙手同時拉向腰側，收緊肩胛骨後停頓，回程緩慢保持張力' },
   { id:'back_ext',      name:'背部伸展機',   muscle:'背',  icon:'🔙', tip:'動作範圍勿過大，避免腰椎壓力' },
   // ── 腿 ──
-  { id:'leg_sled',       name:'大腿推蹬訓練器',     muscle:'腿', icon:'🏗️', tip:'腳掌與肩同寬，膝蓋不鎖死，下降時吸氣推出時吐氣' },
+  { id:'leg_sled',       name:'大腿推蹬訓練器',     muscle:'腿', icon:'🛷', tip:'腳掌與肩同寬，膝蓋不鎖死，下降時吸氣推出時吐氣' },
   { id:'leg_press',      name:'腿部推舉機',         muscle:'腿', icon:'🦵', tip:'腳跟寬度與肩同寬，膝蓋追著腳尖走' },
-  { id:'quad_ext',       name:'大腿伸展訓練機',     muscle:'腿', icon:'📏', tip:'膝蓋對準轉軸，完全伸展後停頓1秒，緩慢下降感受離心' },
+  { id:'quad_ext',       name:'大腿伸展訓練機',     muscle:'腿', icon:'🦿', tip:'膝蓋對準轉軸，完全伸展後停頓1秒，緩慢下降感受離心' },
   { id:'leg_ext',        name:'腿部伸展機',         muscle:'腿', icon:'📐', tip:'動作頂端完全伸展，感受四頭肌' },
-  { id:'leg_curl',       name:'腿部彎舉機',         muscle:'腿', icon:'〽️', tip:'收縮至最大幅度，停頓1秒' },
-  { id:'seated_leg_curl',name:'腿後彎曲訓練機',     muscle:'腿', icon:'🦿', tip:'大腿固定不動，收縮至最大幅度，頂點停頓1秒' },
-  { id:'lying_leg_curl', name:'臥姿腿部彎曲訓練器', muscle:'腿', icon:'🛏️', tip:'腹部貼靠墊子，彎曲至最大幅度，下降時保持張力勿放太快' },
-  { id:'hip_adduct',     name:'髖內收訓練機',       muscle:'腿', icon:'⬅️', tip:'背部貼靠椅背，從鼠蹊部發力夾合，頂點停頓1秒，慢速回程保持張力' },
-  { id:'hip_abduct',     name:'髖關節外展訓練機',   muscle:'腿', icon:'➡️', tip:'背部靠緊椅背，以臀中肌發力向外推，回程緩慢控制' },
+  { id:'leg_curl',       name:'腿部彎舉機',         muscle:'腿', icon:'🔄', tip:'收縮至最大幅度，停頓1秒' },
+  { id:'seated_leg_curl',name:'腿後彎曲訓練機',     muscle:'腿', icon:'🪑', tip:'大腿固定不動，收縮至最大幅度，頂點停頓1秒' },
+  { id:'lying_leg_curl', name:'臥姿腿部彎曲訓練器', muscle:'腿', icon:'🛌', tip:'腹部貼靠墊子，彎曲至最大幅度，下降時保持張力勿放太快' },
+  { id:'hip_adduct',     name:'髖內收訓練機',       muscle:'腿', icon:'🤸', tip:'背部貼靠椅背，從鼠蹊部發力夾合，頂點停頓1秒，慢速回程保持張力' },
+  { id:'hip_abduct',     name:'髖關節外展訓練機',   muscle:'腿', icon:'🏃', tip:'背部靠緊椅背，以臀中肌發力向外推，回程緩慢控制' },
   { id:'calf_raise',     name:'小腿訓練機',         muscle:'腿', icon:'🦶', tip:'動作放慢，完整伸展跟腱' },
   // ── 肩 ──
   { id:'shoulder_press', name:'肩部推舉機', muscle:'肩', icon:'🏋️', tip:'握距略寬於肩，勿聳肩' },
-  { id:'lateral_raise',  name:'側平舉機',   muscle:'肩', icon:'✈️', tip:'控制離心，速度2-3秒下降' },
+  { id:'lateral_raise',  name:'側平舉機',   muscle:'肩', icon:'🕊️', tip:'控制離心，速度2-3秒下降' },
   // ── 手臂 ──
   { id:'bicep_curl',  name:'二頭彎舉機',   muscle:'手臂', icon:'💪', tip:'上臂固定不動，完整動作範圍' },
-  { id:'cable_curl',  name:'繩索二頭彎舉', muscle:'手臂', icon:'🎣', tip:'手腕朝上，峰值收縮停留' },
+  { id:'cable_curl',  name:'繩索二頭彎舉', muscle:'手臂', icon:'🪝', tip:'手腕朝上，峰值收縮停留' },
   { id:'tricep_ext',  name:'三頭伸展機',   muscle:'手臂', icon:'🔱', tip:'肘關節固定，專注在三頭肌出力' },
   // ── 核心 ──
-  { id:'ab_crunch',  name:'腹肌捲腹機', muscle:'核心', icon:'〰️', tip:'呼氣時出力，感受腹直肌收縮' },
+  { id:'ab_crunch',  name:'腹肌捲腹機', muscle:'核心', icon:'🌊', tip:'呼氣時出力，感受腹直肌收縮' },
   { id:'cable_rot',  name:'繩索旋轉',   muscle:'核心', icon:'🌀', tip:'從核心旋轉，非手臂牽引' },
-  { id:'lower_back', name:'下背訓練機', muscle:'核心', icon:'🔒', tip:'動作幅度不宜過大，緩慢伸展與彎曲，全程控制避免腰椎壓力' },
+  { id:'lower_back', name:'下背訓練機', muscle:'核心', icon:'🪨', tip:'動作幅度不宜過大，緩慢伸展與彎曲，全程控制避免腰椎壓力' },
 ];
 
 
@@ -963,6 +1096,7 @@ function switchView(name, btn) {
   if (name === 'history') renderHistory();
   if (name === 'progress') renderProgress();
   if (name === 'equipment') renderEquipment();
+  if (name === 'coach') initCoachView();
 }
 
 // ── TODAY ──
@@ -2390,6 +2524,273 @@ function renderComboChart() {
   });
 }
 
+
+// ── AI COACH ──
+let coachMessages = []; // { role, content }
+
+function getCoachApiKey() {
+  return localStorage.getItem('ironlog_coach_key') || '';
+}
+
+function saveCoachApiKey() {
+  const key = document.getElementById('coach-api-key-inp').value.trim();
+  if (!key.startsWith('AIza')) { showToast('請輸入正確的 Gemini API Key（AIza 開頭）'); return; }
+  localStorage.setItem('ironlog_coach_key', key);
+  initCoachView();
+  showToast('✅ API Key 已儲存');
+}
+
+function initCoachView() {
+  const hasKey = !!getCoachApiKey();
+  const setupEl = document.getElementById('coach-setup');
+  const chatEl  = document.getElementById('coach-chat');
+  if (!setupEl || !chatEl) return;
+
+  if (!hasKey) {
+    setupEl.style.display = 'block';
+    chatEl.style.display  = 'none';
+    return;
+  }
+  setupEl.style.display = 'none';
+  chatEl.style.display  = 'flex';
+
+  // Show welcome message if no history
+  if (coachMessages.length === 0) {
+    appendCoachMsg('coach', `你好！我是你的 AI 健身教練 💪
+
+我已經讀取了你的訓練紀錄，可以針對你的實際數據給出建議。
+
+你可以問我：
+• 本週訓練表現如何？
+• 哪個部位需要加強？
+• 幫我設計下次的訓練計畫
+• 如何突破目前的瓶頸？
+
+或是直接告訴我你的需求！`);
+  }
+}
+
+function buildTrainingSummary() {
+  const data    = getData();
+  const weights = getWeights();
+  const today   = new Date();
+
+  if (data.length === 0) return '目前還沒有任何訓練紀錄。';
+
+  // 最近30天資料
+  const cutoff = new Date(today); cutoff.setDate(today.getDate() - 30);
+  const cutStr = cutoff.toISOString().slice(0,10);
+  const recent = data.filter(e => e.date >= cutStr);
+
+  // 訓練天數
+  const trainDays = new Set(recent.map(e => e.date)).size;
+
+  // 各肌群組數統計（本週）
+  const weekStart = new Date(today); weekStart.setDate(today.getDate() - 6);
+  const weekStr   = weekStart.toISOString().slice(0,10);
+  const weekData  = data.filter(e => e.date >= weekStr && e.type !== 'cardio');
+  const muscleSets = {};
+  weekData.forEach(e => {
+    const m = getEqMuscle(e.eqId);
+    muscleSets[m] = (muscleSets[m]||0) + (e.sets||0);
+  });
+
+  // PR 資訊（最近的幾個）
+  const strengthData = data.filter(e => e.type !== 'cardio' && e.weight != null);
+  const prList = [];
+  const eqIds = [...new Set(strengthData.map(e => e.eqId))];
+  eqIds.forEach(id => {
+    const entries = strengthData.filter(e => e.eqId === id).sort((a,b) => b.date.localeCompare(a.date));
+    if (entries.length > 0) {
+      const maxW = Math.max(...entries.map(e => e.weight));
+      const best = entries.find(e => e.weight === maxW);
+      prList.push(`${getEqName(id)}: ${maxW}kg（${best.date}）`);
+    }
+  });
+
+  // 體重趨勢
+  let weightInfo = '';
+  if (weights.length >= 2) {
+    const latest = weights[weights.length-1];
+    const oldest = weights[0];
+    const diff   = (latest.val - oldest.val).toFixed(1);
+    weightInfo = `體重：${latest.val}kg（${diff > 0 ? '+' : ''}${diff}kg 自 ${oldest.date}）`;
+  } else if (weights.length === 1) {
+    weightInfo = `體重：${weights[0].val}kg`;
+  }
+
+  // 有氧
+  const cardio = recent.filter(e => e.type === 'cardio');
+  const cardioMins = cardio.reduce((a,e) => a + (e.duration||0), 0);
+
+  const muscleLines = Object.keys(muscleSets).length > 0
+    ? Object.entries(muscleSets).map(([m,s]) => '- ' + m + '：' + s + ' 組').join('\n')
+    : '- 本週尚無重訓紀錄';
+  const prLines = prList.slice(0,8).join('\n') || '暫無記錄';
+  return '【訓練資料摘要（最近30天）】\n' +
+    '- 訓練天數：' + trainDays + ' 天\n' +
+    '- 總訓練筆數：' + recent.length + ' 筆\n' +
+    '- 有氧：' + cardioMins + ' 分鐘\n' +
+    (weightInfo ? '- ' + weightInfo + '\n' : '') +
+    '\n【本週肌群訓練組數】\n' + muscleLines +
+    '\n\n【個人最佳重量（PR）】\n' + prLines;
+}
+
+function appendCoachMsg(role, content) {
+  const el = document.getElementById('ai-messages');
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = `ai-msg ${role}`;
+  if (role === 'coach') {
+    // Convert newlines to <br> and bold **text**
+    const formatted = content
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+    div.innerHTML = `<div class="coach-label">🏋️ AI 教練</div>${formatted}`;
+  } else {
+    div.textContent = content;
+  }
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function appendThinking() {
+  const el = document.getElementById('ai-messages');
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'ai-msg thinking';
+  div.id = 'ai-thinking';
+  div.innerHTML = `<span class="ai-typing-dot"></span><span class="ai-typing-dot"></span><span class="ai-typing-dot"></span>`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function removeThinking() {
+  const el = document.getElementById('ai-thinking');
+  if (el) el.remove();
+}
+
+async function sendCoachMessage() {
+  const inputEl = document.getElementById('ai-input');
+  if (!inputEl) return;
+  const userMsg = inputEl.value.trim();
+  if (!userMsg) return;
+
+  const apiKey = getCoachApiKey();
+  if (!apiKey) { showToast('請先設定 API Key'); return; }
+
+  inputEl.value = '';
+  autoResizeAiInput(inputEl);
+
+  // Add user message to UI and history
+  appendCoachMsg('user', userMsg);
+  coachMessages.push({ role: 'user', content: userMsg });
+
+  appendThinking();
+
+  // Build system prompt with training data
+  const trainingSummary = buildTrainingSummary();
+  const systemPrompt = `你是一位專業的健身教練和營養顧問，擅長重訓、器械訓練和運動科學。
+請用繁體中文回答，語氣積極、專業但友善。
+回答要具體、實用，針對用戶的實際訓練數據給出個人化建議。
+適時使用 **粗體** 強調重要內容，用換行分隔段落讓閱讀更清楚。
+
+以下是用戶的訓練資料，請根據這些數據給出個人化建議：
+
+${trainingSummary}`;
+
+  try {
+    // 組建 Gemini 格式對話（system prompt 併入第一則 user 訊息）
+    const recentMsgs = coachMessages.slice(-10);
+    const geminiContents = recentMsgs.map((msg, idx) => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: idx === 0 ? systemPrompt + '\n\n用戶：' + msg.content : msg.content }]
+    }));
+
+    // 主要模型：gemini-3-flash-preview，備用：gemini-2.5-flash
+    const MODELS = ['gemini-3-flash-preview', 'gemini-2.5-flash'];
+    let response = null;
+    let usedModel = '';
+
+    for (const model of MODELS) {
+      try {
+        response = await fetch(
+          'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: geminiContents })
+          }
+        );
+        if (response.ok) { usedModel = model; break; }
+        // If 503/429/404 try next model, otherwise stop
+        if (response.status === 400 || response.status === 401 || response.status === 403) break;
+      } catch(fetchErr) {
+        if (model === MODELS[MODELS.length - 1]) throw fetchErr;
+      }
+    }
+
+    removeThinking();
+
+    if (!response || !response.ok) {
+      const err = await response?.json().catch(() => ({}));
+      const msg = err?.error?.message || 'HTTP ' + (response?.status || '???');
+      appendCoachMsg('coach', '⚠️ 發生錯誤：' + msg + '\n\n請確認 API Key 是否正確。');
+      coachMessages.pop();
+      return;
+    }
+
+    const data = await response.json();
+    const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || '（無回應）';
+
+    appendCoachMsg('coach', replyText);
+    coachMessages.push({ role: 'assistant', content: replyText });
+
+    // Keep conversation history manageable (last 20 messages)
+    if (coachMessages.length > 20) {
+      coachMessages = coachMessages.slice(-20);
+    }
+
+  } catch(e) {
+    removeThinking();
+    appendCoachMsg('coach', `⚠️ 網路錯誤：${e.message}
+
+請確認網路連線正常。`);
+    coachMessages.pop();
+  }
+}
+
+function sendQuick(text) {
+  const inputEl = document.getElementById('ai-input');
+  if (inputEl) {
+    inputEl.value = text;
+    sendCoachMessage();
+  }
+}
+
+function handleAiKeydown(e) {
+  // Send on Enter (not Shift+Enter)
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendCoachMessage();
+  }
+}
+
+function autoResizeAiInput(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function clearCoachChat() {
+  if (coachMessages.length === 0) return;
+  if (!confirm('確定要清除所有對話紀錄？')) return;
+  coachMessages = [];
+  const el = document.getElementById('ai-messages');
+  if (el) el.innerHTML = '';
+  initCoachView();
+  showToast('對話已清除');
+}
+
 // ── MUSCLE BALANCE ──
 function renderMuscleBalance(data) {
   const el = document.getElementById('muscle-balance-content');
@@ -2591,12 +2992,13 @@ function restoreFromBackup(backupDate) {
   const backups = getBackups();
   const bk = backups.find(b => b.date === backupDate);
   if (!bk) { showToast('找不到該備份'); return; }
-  if (!confirm(`確定要還原 ${backupDate} 的備份？\n現有資料將被覆蓋。`)) return;
+  if (!confirm(`確定要還原 ${backupDate} 的備份？\n訓練紀錄和體重將被還原，器材庫設定不受影響。`)) return;
 
+  // 方案A：只還原訓練紀錄和體重，器材庫（ironlog_ceq）完全不動
   saveData(bk.training);
   saveWeights(bk.weights);
-  if (bk.templates) localStorage.setItem('ironlog_tpl', JSON.stringify(bk.templates));
-  if (bk.customEq)  localStorage.setItem('ironlog_ceq', JSON.stringify(bk.customEq));
+  // 注意：不還原 ironlog_ceq（器材設定）和 ironlog_tpl（模板）
+  // 器材庫永遠以手機上最新版本為準
 
   renderToday();
   renderTodayTemplates();
