@@ -350,6 +350,53 @@
 
 
 
+
+    /* ── AI TRAINING PLAN ── */
+    .ai-plan-btn {
+      display:inline-flex; align-items:center; gap:6px;
+      margin-top:10px; padding:9px 16px;
+      background:var(--gold); color:#000;
+      font-family:'Noto Sans TC',sans-serif; font-size:13px; font-weight:700;
+      border:none; border-radius:20px; cursor:pointer;
+      transition:opacity 0.15s;
+    }
+    .ai-plan-btn:active { opacity:0.8; }
+    .plan-item {
+      display:flex; align-items:flex-start; gap:12px;
+      padding:12px 14px; margin-bottom:8px;
+      background:var(--surface2); border:1px solid var(--border);
+      border-radius:var(--radius-sm); transition:all 0.2s; cursor:pointer;
+    }
+    .plan-item.checked {
+      opacity:0.5; background:rgba(82,192,122,0.05);
+      border-color:rgba(82,192,122,0.25);
+    }
+    .plan-check {
+      width:22px; height:22px; border-radius:50%; flex-shrink:0; margin-top:1px;
+      border:2px solid var(--border); background:var(--surface3);
+      display:flex; align-items:center; justify-content:center;
+      transition:all 0.2s;
+    }
+    .plan-item.checked .plan-check {
+      background:#52c07a; border-color:#52c07a;
+    }
+    .plan-check-tick {
+      display:none; width:12px; height:12px;
+      stroke:#000; fill:none; stroke-width:2.5; stroke-linecap:round;
+    }
+    .plan-item.checked .plan-check-tick { display:block; }
+    .plan-item-name { font-size:14px; font-weight:600; line-height:1.3; }
+    .plan-item-detail { font-size:12px; color:var(--text2); margin-top:3px; }
+    .plan-item-note { font-size:11px; color:var(--text3); margin-top:3px; line-height:1.5; }
+    .plan-progress-bar-wrap {
+      height:6px; background:var(--surface3); border-radius:3px;
+      overflow:hidden; margin:12px 0 4px;
+    }
+    .plan-progress-bar {
+      height:100%; background:#52c07a; border-radius:3px;
+      transition:width 0.4s ease;
+    }
+    .plan-progress-text { font-size:11px; color:var(--text2); text-align:right; margin-bottom:12px; }
     /* ── AI COACH ── */
     .ai-chat-wrap {
       display:flex; flex-direction:column;
@@ -982,6 +1029,24 @@
 
     <button class="save-btn" id="import-confirm-btn" style="display:none;" onclick="confirmImport()">✅ 確認匯入</button>
     <button class="btn-sm btn-ghost" style="width:100%;margin-bottom:16px;margin-top:6px;" onclick="closeModal('import-overlay')">取消</button>
+  </div>
+</div>
+
+<!-- AI TRAINING PLAN MODAL -->
+<div class="overlay timer-modal" id="plan-overlay" onclick="handleOverlayClick(event,'plan-overlay')">
+  <div class="modal" style="max-height:88vh;overflow-y:auto;">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div class="modal-title" id="plan-modal-title" style="margin-bottom:0;">今日訓練計畫</div>
+      <div id="plan-modal-progress-text" style="font-size:12px;color:var(--text2);"></div>
+    </div>
+    <div class="plan-progress-bar-wrap">
+      <div class="plan-progress-bar" id="plan-progress-bar" style="width:0%"></div>
+    </div>
+    <div class="plan-progress-text" id="plan-progress-label"></div>
+    <div id="plan-item-list"></div>
+    <button class="btn-sm btn-ghost" style="width:100%;margin-bottom:16px;margin-top:4px;"
+      onclick="closeModal('plan-overlay')">關閉</button>
   </div>
 </div>
 <!-- REST TIMER MODAL -->
@@ -2640,13 +2705,16 @@ function appendCoachMsg(role, content) {
   const el = document.getElementById('ai-messages');
   if (!el) return;
   const div = document.createElement('div');
-  div.className = `ai-msg ${role}`;
+  div.className = 'ai-msg ' + role;
   if (role === 'coach') {
-    // Convert newlines to <br> and bold **text**
     const formatted = content
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\n/g, '<br>');
-    div.innerHTML = `<div class="coach-label">🏋️ AI 教練</div>${formatted}`;
+    div.innerHTML = '<div class="coach-label">🏋️ AI 教練</div>' + formatted;
+    // 偵測是否包含訓練計畫，若有則附加按鈕
+    if (detectTrainingPlan(content)) {
+      appendPlanButton(div, content);
+    }
   } else {
     div.textContent = content;
   }
@@ -2789,6 +2857,179 @@ function clearCoachChat() {
   if (el) el.innerHTML = '';
   initCoachView();
   showToast('對話已清除');
+}
+
+
+// ── AI TRAINING PLAN ──
+let currentPlanItems = []; // { id, name, sets, reps, weight, note, done }
+
+// 偵測 AI 回覆是否包含訓練計畫內容
+function detectTrainingPlan(text) {
+  const keywords = ['訓練計畫','訓練建議','建議訓練','以下訓練','今日訓練','動作如下',
+                    '組數','次數','器材','建議動作','訓練組合','以下是','推薦'];
+  const eqNames = getAllEquipment().map(e => e.name);
+  const hasKeyword = keywords.some(k => text.includes(k));
+  const hasEqName  = eqNames.some(n => text.includes(n));
+  return hasKeyword && hasEqName;
+}
+
+// 在 AI 訊息後附加「產生訓練清單」按鈕
+function appendPlanButton(msgDiv, replyText) {
+  const btn = document.createElement('button');
+  btn.className = 'ai-plan-btn';
+  btn.innerHTML = '📋 產生今日訓練清單';
+  btn.onclick = () => generatePlanFromReply(replyText, btn);
+  msgDiv.appendChild(btn);
+}
+
+// 呼叫 AI 取得結構化 JSON 訓練清單
+async function generatePlanFromReply(replyText, btn) {
+  btn.textContent = '⏳ 產生中...';
+  btn.disabled = true;
+
+  const apiKey = getCoachApiKey();
+  if (!apiKey) { showToast('請先設定 API Key'); btn.textContent = '📋 產生今日訓練清單'; btn.disabled=false; return; }
+
+  const allEqNames = getAllEquipment().map(e => e.name).join('、');
+  const prompt = `根據以下訓練建議，提取出具體的訓練動作清單，以 JSON 格式回傳。
+  
+訓練建議內容：
+${replyText}
+
+可用器材名稱（只能從這裡選）：${allEqNames}
+
+請回傳純 JSON，格式如下（不要加任何說明文字或 markdown）：
+{
+  "title": "訓練計畫標題",
+  "items": [
+    { "name": "器材名稱", "sets": 3, "reps": 10, "weight": 0, "note": "重點提示" }
+  ]
+}
+
+規則：
+- name 必須完全符合可用器材名稱之一
+- weight 填 0 表示待使用者自行填入
+- note 填入該動作的重點提示（20字以內）
+- 最多 12 個動作
+- 若建議中有有氧，name 填「跑步機」並在 note 說明時間距離`;
+
+  try {
+    const MODELS = ['gemini-3-flash-preview', 'gemini-2.5-flash'];
+    let response = null;
+    for (const model of MODELS) {
+      try {
+        response = await fetch(
+          'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ role:'user', parts:[{ text: prompt }] }] })
+          }
+        );
+        if (response.ok) break;
+        if (response.status === 400 || response.status === 401 || response.status === 403) break;
+      } catch(e) { if (model === MODELS[MODELS.length-1]) throw e; }
+    }
+
+    const data = await response.json();
+    let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    rawText = rawText.replace(/```json|```/g,'').trim();
+
+    const plan = JSON.parse(rawText);
+    if (!plan.items || plan.items.length === 0) throw new Error('no items');
+
+    openPlanModal(plan);
+    btn.textContent = '✅ 已產生清單';
+    btn.style.background = 'rgba(82,192,122,0.2)';
+    btn.style.color = '#52c07a';
+    btn.style.border = '1px solid rgba(82,192,122,0.3)';
+
+  } catch(e) {
+    console.error(e);
+    showToast('⚠️ 無法產生清單，請重試');
+    btn.textContent = '📋 產生今日訓練清單';
+    btn.disabled = false;
+  }
+}
+
+function openPlanModal(plan) {
+  const titleEl = document.getElementById('plan-modal-title');
+  if (titleEl) titleEl.textContent = plan.title || '今日訓練計畫';
+
+  currentPlanItems = plan.items.map((item, i) => ({
+    id: 'plan-' + i,
+    name:   item.name   || '',
+    sets:   item.sets   || 0,
+    reps:   item.reps   || 0,
+    weight: item.weight || 0,
+    note:   item.note   || '',
+    done:   false
+  }));
+
+  renderPlanItems();
+  document.getElementById('plan-overlay').classList.add('open');
+}
+
+function renderPlanItems() {
+  const listEl = document.getElementById('plan-item-list');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+
+  currentPlanItems.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'plan-item' + (item.done ? ' checked' : '');
+    div.id = item.id + '-div';
+    div.onclick = () => togglePlanItem(item.id);
+
+    const detailParts = [];
+    if (item.sets) detailParts.push(item.sets + ' 組');
+    if (item.reps) detailParts.push(item.reps + ' 下');
+    if (item.weight) detailParts.push(item.weight + ' kg');
+
+    div.innerHTML = `
+      <div class="plan-check">
+        <svg class="plan-check-tick" viewBox="0 0 12 12">
+          <polyline points="2 6 5 9 10 3"/>
+        </svg>
+      </div>
+      <div style="flex:1;">
+        <div class="plan-item-name">${item.name}</div>
+        ${detailParts.length ? '<div class="plan-item-detail">' + detailParts.join(' × ') + '</div>' : ''}
+        ${item.note ? '<div class="plan-item-note">' + item.note + '</div>' : ''}
+      </div>`;
+    listEl.appendChild(div);
+  });
+
+  updatePlanProgress();
+}
+
+function togglePlanItem(itemId) {
+  const item = currentPlanItems.find(i => i.id === itemId);
+  if (!item) return;
+  item.done = !item.done;
+
+  const div = document.getElementById(itemId + '-div');
+  if (div) div.className = 'plan-item' + (item.done ? ' checked' : '');
+
+  updatePlanProgress();
+}
+
+function updatePlanProgress() {
+  const total = currentPlanItems.length;
+  const done  = currentPlanItems.filter(i => i.done).length;
+  const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  const bar   = document.getElementById('plan-progress-bar');
+  const label = document.getElementById('plan-progress-label');
+  const text  = document.getElementById('plan-modal-progress-text');
+
+  if (bar)   bar.style.width = pct + '%';
+  if (label) label.textContent = done + ' / ' + total + ' 項完成';
+  if (text)  { text.textContent = done + '/' + total; text.style.color = done === total ? '#52c07a' : 'var(--text2)'; }
+
+  if (done === total && total > 0) {
+    showToast('🎉 今日訓練計畫全部完成！');
+  }
 }
 
 // ── MUSCLE BALANCE ──
